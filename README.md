@@ -42,8 +42,8 @@ For job and law names, use the enum values shown by the command's error message,
 
 - World-level saved data for kingdoms, settlements and world history
 - Separate saved NPC profiles, memories, family/settlement/kingdom links, personality and relationship scores
-- NPC age/lifecycle updates and a budget model for different simulation distances
-- Kingdom treasury updates, settlement population growth and market price adjustment
+- NPC age/lifecycle updates, persistent home assignments and civilian job routines
+- Kingdom treasury updates, need-driven population changes, persistent market prices and citizen mood
 - NPC help/refuse interaction state and temporary speech bubbles for spawned villagers
 - Building project planning, housing capacity, roads, resources, jobs and education data models
 - Government, laws, group reputation, factions, elections, family/dynasty and citizen mood data models
