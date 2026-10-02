@@ -14,14 +14,14 @@ public final class NpcManager {
   List<NpcPersistentState.NpcData> out=new ArrayList<>();
   for(NpcProfile p:profiles.values()){
    List<NpcPersistentState.MemoryData> memories=p.memories().stream().map(m->new NpcPersistentState.MemoryData(m.type(),m.target()==null?"":m.target().toString(),m.tick(),m.importance())).toList();
-   out.add(new NpcPersistentState.NpcData(p.id().toString(),p.name(),p.age(),p.money(),p.ambition(),p.loyalty(),p.alive(),p.job(),id(p.familyId()),id(p.settlementId()),id(p.kingdomId()),p.personality().name(),memories));
+   List<NpcPersistentState.RelationshipData> relationships=p.relationships().entrySet().stream().map(e->new NpcPersistentState.RelationshipData(e.getKey().toString(),e.getValue())).toList();\n   out.add(new NpcPersistentState.NpcData(p.id().toString(),p.name(),p.age(),p.money(),p.ambition(),p.loyalty(),p.alive(),p.job(),id(p.familyId()),id(p.settlementId()),id(p.kingdomId()),p.personality().name(),memories,relationships));
   }return List.copyOf(out);
  }
  public void restore(Collection<NpcPersistentState.NpcData> data){
   profiles.clear();for(var d:data)try{
    NpcProfile p=new NpcProfile(UUID.fromString(d.id()),d.name());p.setAge(d.age());p.setMoney(d.money());p.setAmbition(d.ambition());p.setLoyalty(d.loyalty());p.setAlive(d.alive());p.setJob(d.job());p.setFamily(uuid(d.familyId()));p.setSettlement(uuid(d.settlementId()));p.setKingdom(uuid(d.kingdomId()));
    try{p.setPersonality(NpcPersonality.valueOf(d.personality()));}catch(IllegalArgumentException ignored){}
-   for(var m:d.memories())p.addMemory(m.type(),uuid(m.target()),m.tick(),m.importance());profiles.put(p.id(),p);
+   for(var m:d.memories())p.addMemory(m.type(),uuid(m.target()),m.tick(),m.importance());for(var rel:d.relationships()){UUID other=uuid(rel.otherId());if(other!=null)p.setRelationship(other,rel.score());}profiles.put(p.id(),p);
   }catch(IllegalArgumentException ignored){}
  }
  private static String id(UUID id){return id==null?"":id.toString();}
