@@ -1,7 +1,1 @@
-package nl.worldmorph.sim;
-import net.minecraft.server.MinecraftServer; import net.minecraft.server.level.ServerLevel; import nl.worldmorph.data.WorldMorphState; import nl.worldmorph.data.WorldMorphStateAccess;
-public final class WorldMorphSimulation {
- private final EconomyManager economy=new EconomyManager(); private final DiplomacyManager diplomacy=new DiplomacyManager();
- public void tick(MinecraftServer server){ServerLevel l=server.overworld();WorldMorphState s=WorldMorphStateAccess.get(l);s.tick();if(s.getSimulationTick()%200==0){for(WorldMorphState.SettlementData x:s.settlements().values())if(x.population()<1000)s.settlements().put(x.id(),x.grow());economy.trade("wheat",100,100);}}
- public EconomyManager economy(){return economy;} public DiplomacyManager diplomacy(){return diplomacy;}
-}
+package nl.worldmorph.sim; import net.minecraft.server.MinecraftServer; import net.minecraft.server.level.ServerLevel; import nl.worldmorph.data.*; import nl.worldmorph.npc.NpcManager; public final class WorldMorphSimulation { private final EconomyManager economy=new EconomyManager(); private final DiplomacyManager diplomacy=new DiplomacyManager(); private final SettlementSimulator settlements=new SettlementSimulator(); private final KingdomSimulator kingdoms=new KingdomSimulator(); private final NpcManager npcs=new NpcManager(); public void tick(MinecraftServer server){ServerLevel l=server.overworld();WorldMorphState s=WorldMorphStateAccess.get(l);s.tick();settlements.tick(s);kingdoms.tick(s);npcs.simulate(s.getSimulationTick());if(s.getSimulationTick()%200==0)economy.trade("wheat",100,100);} public EconomyManager economy(){return economy;} public DiplomacyManager diplomacy(){return diplomacy;} public NpcManager npcs(){return npcs;} }
