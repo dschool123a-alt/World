@@ -17,7 +17,6 @@ public final class NpcRoutineSimulator {
     case "WOODCUTTER"->resources.add(npc.settlementId(),ResourceManager.Resource.WOOD,2);
     case "MINER"->resources.add(npc.settlementId(),ResourceManager.Resource.STONE,2);
     case "SCHOLAR"->needs.change(npc.settlementId(),SettlementNeedsManager.Need.WORK,1);
-    case "KNIGHT","SOLDIER","ARCHER"->needs.change(npc.settlementId(),SettlementNeedsManager.Need.SAFETY,1);
     default->{}
    }
    npc.addMemory("DAILY_ROUTINE_"+npc.job(),null,state.getSimulationTick(),1);
