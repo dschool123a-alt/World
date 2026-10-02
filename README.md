@@ -25,3 +25,6 @@ Expected result:
 ## Build
 
 GitHub Actions builds the mod with Java 25 and Gradle 9.6.0 on every push and pull request.
+
+
+Build verification branch.
