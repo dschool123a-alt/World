@@ -26,5 +26,5 @@ public final class NpcManager {
  }
  private static String id(UUID id){return id==null?"":id.toString();}
  private static UUID uuid(String id){if(id==null||id.isBlank())return null;try{return UUID.fromString(id);}catch(IllegalArgumentException ex){return null;}}
- public void simulate(long tick){if(tick%1200!=0)return;for(NpcProfile p:profiles.values())if(p.alive()){p.ageOne();if(p.age()>90){p.die();p.addMemory("DIED_OLD_AGE",null,tick,10);}}}
+ public void simulate(long tick){if(tick%24000!=0)return;for(NpcProfile p:profiles.values())if(p.alive()){p.ageOne();if(p.age()>90){p.die();p.addMemory("DIED_OLD_AGE",null,tick,10);}}}
 }
