@@ -28,3 +28,5 @@ GitHub Actions builds the mod with Java 25 and Gradle 9.6.0 on every push and pu
 
 
 Build verification branch.
+
+CI trigger: 26.3 API compatibility fixes.
