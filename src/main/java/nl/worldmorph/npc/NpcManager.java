@@ -3,7 +3,8 @@ import java.util.*;
 import nl.worldmorph.data.NpcPersistentState;
 public final class NpcManager {
  private final Map<UUID,NpcProfile> profiles=new LinkedHashMap<>();
- public NpcProfile create(String name){NpcProfile p=new NpcProfile(UUID.randomUUID(),name);profiles.put(p.id(),p);return p;}
+ public NpcProfile create(String name){return create(UUID.randomUUID(),name);}
+ public NpcProfile create(UUID id,String name){NpcProfile p=new NpcProfile(id,name);profiles.put(p.id(),p);return p;}
  public NpcProfile get(UUID id){return profiles.get(id);}
  public NpcProfile getByName(String name){return profiles.values().stream().filter(p->p.name().equalsIgnoreCase(name)).findFirst().orElse(null);}
  public int size(){return profiles.size();}
