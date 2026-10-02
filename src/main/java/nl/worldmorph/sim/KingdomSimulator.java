@@ -1,0 +1,1 @@
+package nl.worldmorph.sim; import nl.worldmorph.data.WorldMorphState; public final class KingdomSimulator { public void tick(WorldMorphState s){if(s.getSimulationTick()%100!=0)return;for(var x:s.kingdoms().values())s.kingdoms().put(x.id(),x.withTreasury(Math.max(0,x.treasury()-1)));} }
