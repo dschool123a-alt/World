@@ -11,7 +11,7 @@ public final class WorldMorphSimulation {
   ServerLevel level=server.overworld();WorldMorphState state=WorldMorphStateAccess.get(level);NpcPersistentState npcState=NpcPersistentStateAccess.get(level);HomePersistentState homeState=HomePersistentStateAccess.get(level);NeedsPersistentState needsState=NeedsPersistentStateAccess.get(level);EconomyPersistentState economyState=level.getDataStorage().computeIfAbsent(EconomyPersistentState.TYPE);
   if(loadedLevel!=level){npcs.restore(npcState.all());homes.restore(homeState.all());needs.restore(needsState.all());economy.restore(economyState.all());loadedLevel=level;}
   state.tick();bubbles.tick(level,state.getSimulationTick());settlements.tick(state);kingdoms.tick(state);needsSimulator.tick(state,needs,citizenMood);npcs.simulate(state.getSimulationTick());npcRoutines.tick(state,npcs,needs,resources);treaties.expire(state.getSimulationTick());
-  if(state.getSimulationTick()%20==0){npcState.replaceAll(npcs.snapshots());homeState.replaceAll(homes.snapshots());needsState.replaceAll(needs.snapshots());}
+  if(state.getSimulationTick()%20==0){npcState.replaceAll(npcs.snapshots());homeState.replaceAll(homes.snapshots());needsState.replaceAll(needs.snapshots());economyState.replaceAll(economy.snapshots());}
   if(state.getSimulationTick()%200==0){economy.trade("wheat",100,100);}
   if(state.getSimulationTick()%1200==0)for(var k:state.kingdoms().values())if(rebellion.resolve(state,k.id())){}
  }
