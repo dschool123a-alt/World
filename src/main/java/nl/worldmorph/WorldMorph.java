@@ -3,6 +3,7 @@ package nl.worldmorph;
 import com.mojang.brigadier.CommandDispatcher;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -23,6 +24,11 @@ public final class WorldMorph implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
             registerCommands(dispatcher)
         );
+
+        ServerTickEvents.END_WORLD_TICK.register(level -> {
+            WorldMorphState state = WorldMorphStateAccess.get(level);
+            state.tick();
+        });
     }
 
     private static void registerCommands(CommandDispatcher<CommandSourceStack> dispatcher) {
