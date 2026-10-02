@@ -17,7 +17,39 @@ public final class WorldMorphState extends SavedData {
 
     public static WorldMorphState load(CompoundTag tag) {
         WorldMorphState state = new WorldMorphState();
-        state.simulationTick = tag.getLong("SimulationTick").orElse(0L);
+        state.simulationTick = tag.getLongOr("SimulationTick", 0L);
+
+        tag.getCompound("Kingdoms").ifPresent(kingdomsTag -> {
+            for (String key : kingdomsTag.getAllKeys()) {
+                kingdomsTag.getCompound(key).ifPresent(data -> {
+                    try {
+                        UUID id = UUID.fromString(key);
+                        UUID leader = UUID.fromString(data.getStringOr("Leader", new UUID(0L, 0L).toString()));
+                        String name = data.getStringOr("Name", "Unnamed Kingdom");
+                        state.kingdoms.put(id, new KingdomData(id, name, leader));
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                });
+            }
+        });
+
+        tag.getCompound("Settlements").ifPresent(settlementsTag -> {
+            for (String key : settlementsTag.getAllKeys()) {
+                settlementsTag.getCompound(key).ifPresent(data -> {
+                    try {
+                        UUID id = UUID.fromString(key);
+                        UUID kingdomId = UUID.fromString(data.getStringOr("Kingdom", new UUID(0L, 0L).toString()));
+                        String name = data.getStringOr("Name", "Unnamed Settlement");
+                        int x = data.getIntOr("X", 0);
+                        int y = data.getIntOr("Y", 0);
+                        int z = data.getIntOr("Z", 0);
+                        state.settlements.put(id, new SettlementData(id, name, new BlockPos(x, y, z), kingdomId));
+                    } catch (IllegalArgumentException ignored) {
+                    }
+                });
+            }
+        });
+
         return state;
     }
 
@@ -27,6 +59,9 @@ public final class WorldMorphState extends SavedData {
 
     public void tick() {
         simulationTick++;
+        if (simulationTick % 20 == 0) {
+            setDirty();
+        }
     }
 
     public long getSimulationTick() {
@@ -58,8 +93,28 @@ public final class WorldMorphState extends SavedData {
     @Override
     public CompoundTag save(CompoundTag tag) {
         tag.putLong("SimulationTick", simulationTick);
-        tag.putInt("KingdomCount", kingdoms.size());
-        tag.putInt("SettlementCount", settlements.size());
+
+        CompoundTag kingdomsTag = new CompoundTag();
+        for (KingdomData kingdom : kingdoms.values()) {
+            CompoundTag data = new CompoundTag();
+            data.putString("Name", kingdom.name());
+            data.putString("Leader", kingdom.leader().toString());
+            kingdomsTag.put(kingdom.id().toString(), data);
+        }
+        tag.put("Kingdoms", kingdomsTag);
+
+        CompoundTag settlementsTag = new CompoundTag();
+        for (SettlementData settlement : settlements.values()) {
+            CompoundTag data = new CompoundTag();
+            data.putString("Name", settlement.name());
+            data.putString("Kingdom", settlement.kingdomId().toString());
+            data.putInt("X", settlement.center().getX());
+            data.putInt("Y", settlement.center().getY());
+            data.putInt("Z", settlement.center().getZ());
+            settlementsTag.put(settlement.id().toString(), data);
+        }
+        tag.put("Settlements", settlementsTag);
+
         return tag;
     }
 
