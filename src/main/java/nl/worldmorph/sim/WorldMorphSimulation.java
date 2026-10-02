@@ -9,7 +9,7 @@ public final class WorldMorphSimulation {
  private ServerLevel loadedLevel;
  public void tick(MinecraftServer server){
   ServerLevel level=server.overworld();WorldMorphState state=WorldMorphStateAccess.get(level);NpcPersistentState npcState=NpcPersistentStateAccess.get(level);HomePersistentState homeState=HomePersistentStateAccess.get(level);NeedsPersistentState needsState=NeedsPersistentStateAccess.get(level);EconomyPersistentState economyState=level.getDataStorage().computeIfAbsent(EconomyPersistentState.TYPE);
-  if(loadedLevel!=level){npcs.restore(npcState.all());homes.restore(homeState.all());needs.restore(needsState.all());loadedLevel=level;}
+  if(loadedLevel!=level){npcs.restore(npcState.all());homes.restore(homeState.all());needs.restore(needsState.all());economy.restore(economyState.all());loadedLevel=level;}
   state.tick();bubbles.tick(level,state.getSimulationTick());settlements.tick(state);kingdoms.tick(state);needsSimulator.tick(state,needs,citizenMood);npcs.simulate(state.getSimulationTick());npcRoutines.tick(state,npcs,needs,resources);treaties.expire(state.getSimulationTick());
   if(state.getSimulationTick()%20==0){npcState.replaceAll(npcs.snapshots());homeState.replaceAll(homes.snapshots());needsState.replaceAll(needs.snapshots());}
   if(state.getSimulationTick()%200==0){economy.trade("wheat",100,100);}
