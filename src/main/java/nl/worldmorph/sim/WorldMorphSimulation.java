@@ -11,7 +11,7 @@ public final class WorldMorphSimulation {
   ServerLevel level=server.overworld();WorldMorphState state=WorldMorphStateAccess.get(level);NpcPersistentState npcState=NpcPersistentStateAccess.get(level);HomePersistentState homeState=HomePersistentStateAccess.get(level);
   if(loadedLevel!=level){npcs.restore(npcState.all());homes.restore(homeState.all());loadedLevel=level;}
   state.tick();bubbles.tick(level,state.getSimulationTick());settlements.tick(state);kingdoms.tick(state);npcs.simulate(state.getSimulationTick());treaties.expire(state.getSimulationTick());
-  if(state.getSimulationTick()%20==0)npcState.replaceAll(npcs.snapshots());
+  if(state.getSimulationTick()%20==0){npcState.replaceAll(npcs.snapshots());homeState.replaceAll(homes.snapshots());}
   if(state.getSimulationTick()%200==0){economy.trade("wheat",100,100);}
   if(state.getSimulationTick()%1200==0)for(var k:state.kingdoms().values())if(rebellion.resolve(state,k.id())){}
  }
