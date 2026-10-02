@@ -21,3 +21,7 @@ Expected result:
 - Fabric API 0.161.0+26.3
 - Java 25
 - Fabric Loom 1.17.21
+
+## Build
+
+GitHub Actions builds the mod with Java 25 and Gradle 9.6.0 on every push and pull request.
