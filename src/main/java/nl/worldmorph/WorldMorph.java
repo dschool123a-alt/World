@@ -25,9 +25,9 @@ public final class WorldMorph implements ModInitializer {
             registerCommands(dispatcher)
         );
 
-        ServerTickEvents.END_WORLD_TICK.register(level -> {
-            WorldMorphState state = WorldMorphStateAccess.get(level);
-            state.tick();
+        ServerTickEvents.END_SERVER_TICK.register(server -> {
+            ServerLevel overworld = server.overworld();
+            WorldMorphStateAccess.get(overworld).tick();
         });
     }
 
@@ -43,7 +43,7 @@ public final class WorldMorph implements ModInitializer {
                         return 1;
                     }))
                 .then(Commands.literal("debug")
-                    .requires(source -> source.hasPermission(2))
+                    .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                     .executes(context -> {
                         ServerLevel level = context.getSource().getLevel();
                         WorldMorphState state = WorldMorphStateAccess.get(level);
