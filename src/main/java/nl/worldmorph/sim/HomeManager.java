@@ -14,6 +14,6 @@ public final class HomeManager {
  public boolean move(UUID npc,BlockPos pos,long tick){Home old=homes.get(npc);if(old==null)return false;homes.put(npc,new Home(npc,old.hostPlayer(),old.settlement(),pos,old.type(),tick));return true;}
  public List<HomePersistentState.HomeData> snapshots(){return homes.values().stream().map(h->new HomePersistentState.HomeData(h.npc().toString(),id(h.hostPlayer()),id(h.settlement()),h.position(),h.type().name(),h.movedInTick())).toList();}
  public void restore(Collection<HomePersistentState.HomeData> data){homes.clear();for(var d:data)try{UUID npc=UUID.fromString(d.npc());UUID host=uuid(d.hostPlayer());UUID settlement=uuid(d.settlement());Type type=Type.valueOf(d.type());homes.put(npc,new Home(npc,host,settlement,d.position(),type,d.movedInTick()));}catch(IllegalArgumentException ignored){}}
- private static String id(UUID id){return id==null?\"\":id.toString();}
+ private static String id(UUID id){return id==null?"":id.toString();}
  private static UUID uuid(String value){if(value==null||value.isBlank())return null;try{return UUID.fromString(value);}catch(IllegalArgumentException ex){return null;}}
 }
