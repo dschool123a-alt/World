@@ -14,7 +14,8 @@ public final class NpcManager {
   List<NpcPersistentState.NpcData> out=new ArrayList<>();
   for(NpcProfile p:profiles.values()){
    List<NpcPersistentState.MemoryData> memories=p.memories().stream().map(m->new NpcPersistentState.MemoryData(m.type(),m.target()==null?"":m.target().toString(),m.tick(),m.importance())).toList();
-   List<NpcPersistentState.RelationshipData> relationships=p.relationships().entrySet().stream().map(e->new NpcPersistentState.RelationshipData(e.getKey().toString(),e.getValue())).toList();\n   out.add(new NpcPersistentState.NpcData(p.id().toString(),p.name(),p.age(),p.money(),p.ambition(),p.loyalty(),p.alive(),p.job(),id(p.familyId()),id(p.settlementId()),id(p.kingdomId()),p.personality().name(),memories,relationships));
+   List<NpcPersistentState.RelationshipData> relationships=p.relationships().entrySet().stream().map(e->new NpcPersistentState.RelationshipData(e.getKey().toString(),e.getValue())).toList();
+   out.add(new NpcPersistentState.NpcData(p.id().toString(),p.name(),p.age(),p.money(),p.ambition(),p.loyalty(),p.alive(),p.job(),id(p.familyId()),id(p.settlementId()),id(p.kingdomId()),p.personality().name(),memories,relationships));
   }return List.copyOf(out);
  }
  public void restore(Collection<NpcPersistentState.NpcData> data){
