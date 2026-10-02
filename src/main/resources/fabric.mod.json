@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "worldmorph",
+  "version": "${version}",
+  "name": "WorldMorph",
+  "description": "Server-side civilization simulation for Minecraft.",
+  "authors": ["dschool123a-alt"],
+  "license": "MIT",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "nl.worldmorph.WorldMorph"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "26.3",
+    "fabric-api": ">=0.161.0+26.3"
+  }
+}
