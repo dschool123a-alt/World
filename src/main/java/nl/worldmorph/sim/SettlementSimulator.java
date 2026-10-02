@@ -1,0 +1,1 @@
+package nl.worldmorph.sim; import nl.worldmorph.data.WorldMorphState; public final class SettlementSimulator { public void tick(WorldMorphState s){if(s.getSimulationTick()%200!=0)return;for(var x:s.settlements().values())if(x.population()<1000)s.settlements().put(x.id(),x.grow());} }
