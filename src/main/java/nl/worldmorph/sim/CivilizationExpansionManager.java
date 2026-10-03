@@ -27,12 +27,14 @@ public final class CivilizationExpansionManager {
     private static final int ROAD_COST = 10;
     private final Set<UUID> seededSettlements = new HashSet<>();
     private final Set<UUID> castleBuiltKingdoms = new HashSet<>();
+    private final ConstructionProjectManager constructionProjects = new ConstructionProjectManager();
 
     public void tick(ServerLevel level, WorldMorphState state, NpcManager npcs,
                      FamilyManager families, RelationshipManager relationships,
                      MarriageManager marriages, JobManager jobs, ResourceManager resources,
                      TechnologyManager technology, TerritoryManager territory,
                      RoadNetwork roads, HousingManager housing) {
+        constructionProjects.tick(level, state, housing);
         long tick = state.getSimulationTick();
         if (tick % FAST == 0) {
             for (WorldMorphState.SettlementData settlement : List.copyOf(state.settlements().values())) {
@@ -176,23 +178,23 @@ public final class CivilizationExpansionManager {
         territory.claim(s.kingdomId(), s.center(), radius, state.getSimulationTick());
     }
 
-    // 18-20: homes physically appear as population grows.
+    // 18-20: homes are queued and then physically placed one block at a time by villagers.
     private void buildNeededHomes(ServerLevel level, WorldMorphState.SettlementData s, NpcManager npcs,
                                   HousingManager housing, WorldMorphState state) {
-        int desired = Math.max(1, (int) Math.ceil(citizens(npcs, s.id()).stream().filter(NpcProfile::alive).count() / 4.0));
-        int missing = Math.min(MAX_HOUSE_BUILD, Math.max(0, desired - housing.get(s.id()).houses()));
+        int citizens = (int) citizens(npcs, s.id()).stream().filter(NpcProfile::alive).count();
+        int desired = Math.max(1, (int) Math.ceil(citizens / 4.0));
+        int missing = Math.min(MAX_HOUSE_BUILD, Math.max(0,
+                desired - housing.get(s.id()).houses() - constructionProjects.pendingHouses(s.id())));
         for (int i = 0; i < missing; i++) {
-            BlockPos pos = findBuildPos(level, s.center(), housing.get(s.id()).houses() + i + 1);
+            BlockPos pos = findBuildPos(level, s.center(),
+                    housing.get(s.id()).houses() + constructionProjects.pendingHouses(s.id()) + i + 1);
             if (pos == null) continue;
-            WorldMorphState.KingdomData kingdom = state.kingdoms().get(s.kingdomId());
-            if (kingdom == null || !state.spendTreasury(s.kingdomId(), HOUSE_COST, "house construction")) continue;
+            if (!state.spendTreasury(s.kingdomId(), HOUSE_COST, "house construction")) continue;
             int kingdomPopulation = state.settlements().values().stream()
                     .filter(x -> x.kingdomId().equals(s.kingdomId()))
                     .mapToInt(WorldMorphState.SettlementData::population).sum();
             int houseTier = kingdomPopulation >= 50 ? 2 : kingdomPopulation >= 20 ? 1 : 0;
-            buildHouse(level, pos, houseTier);
-            housing.addHouse(s.id(), 4);
-            state.history("HOUSE_BUILT", s.name() + " built a new house");
+            constructionProjects.requestHouse(s, pos, houseTier);
         }
     }
 
@@ -300,7 +302,7 @@ public final class CivilizationExpansionManager {
         if (day % 12 == 0) immigration(settlement, s, npcs, housing);
         if (day % 20 == 0) migration(settlement, s, npcs);
         if (day % 30 == 0) monument(level, settlement, s);
-        buildCastleWhenReady(level, s, settlement);
+        constructionProjects.requestCastleIfReady(level, s, settlement);
     }
 
     // 39: seasons change production without changing the core deterministic simulation.
@@ -409,105 +411,6 @@ public final class CivilizationExpansionManager {
         for (int y = 0; y < 3; y++) level.setBlock(base.above(y), Blocks.STONE_BRICKS.defaultBlockState(), 3);
         level.setBlock(base.above(3), Blocks.GOLD_BLOCK.defaultBlockState(), 3);
         state.history("MONUMENT_RAISED", s.name() + " raised a civic monument");
-    }
-
-    /**
-     * Housing evolves with the kingdom: starter plains-village cottages first,
-     * sturdier town houses next, then decorated manor-style homes.
-     */
-    private void buildHouse(ServerLevel level, BlockPos base, int tier) {
-        var floor = tier == 0 ? Blocks.COBBLESTONE.defaultBlockState()
-                : tier == 1 ? Blocks.STONE_BRICKS.defaultBlockState()
-                : Blocks.POLISHED_ANDESITE.defaultBlockState();
-        var wall = tier == 0 ? Blocks.OAK_PLANKS.defaultBlockState()
-                : tier == 1 ? Blocks.SPRUCE_PLANKS.defaultBlockState()
-                : Blocks.DARK_OAK_PLANKS.defaultBlockState();
-        var log = tier == 0 ? Blocks.OAK_LOG.defaultBlockState()
-                : tier == 1 ? Blocks.SPRUCE_LOG.defaultBlockState()
-                : Blocks.DARK_OAK_LOG.defaultBlockState();
-        var roof = tier == 0 ? Blocks.SPRUCE_SLAB.defaultBlockState()
-                : tier == 1 ? Blocks.STONE_BRICK_STAIRS.defaultBlockState()
-                : Blocks.DEEPSLATE_BRICK_STAIRS.defaultBlockState();
-        var glass = Blocks.GLASS_PANE.defaultBlockState();
-
-        for (int x = 0; x < 7; x++) for (int z = 0; z < 7; z++) {
-            level.setBlock(base.offset(x, 0, z), floor, 3);
-            boolean edge = x == 0 || x == 6 || z == 0 || z == 6;
-            for (int y = 1; y <= 3; y++) {
-                if (!edge) continue;
-                if (z == 0 && x == 3 && y <= 2) continue;
-                boolean corner = (x == 0 || x == 6) && (z == 0 || z == 6);
-                boolean window = y == 2 && (((z == 0 || z == 6) && (x == 2 || x == 4))
-                        || ((x == 0 || x == 6) && (z == 2 || z == 4)));
-                level.setBlock(base.offset(x, y, z), corner ? log : window ? glass : wall, 3);
-            }
-        }
-        // Stepped roof and ridge make it read like a generated village cottage.
-        for (int layer = 0; layer < 3; layer++) {
-            int min = layer, max = 6 - layer, y = 4 + layer;
-            for (int x = min; x <= max; x++) {
-                level.setBlock(base.offset(x, y, min), roof, 3);
-                level.setBlock(base.offset(x, y, max), roof, 3);
-            }
-            for (int z = min; z <= max; z++) {
-                level.setBlock(base.offset(min, y, z), roof, 3);
-                level.setBlock(base.offset(max, y, z), roof, 3);
-            }
-        }
-        var ridge = tier == 0 ? Blocks.SPRUCE_PLANKS.defaultBlockState()
-                : tier == 1 ? Blocks.STONE_BRICKS.defaultBlockState()
-                : Blocks.POLISHED_DEEPSLATE.defaultBlockState();
-        for (int x = 2; x <= 4; x++) level.setBlock(base.offset(x, 6, 3), ridge, 3);
-        level.setBlock(base.offset(3, 1, 0), Blocks.AIR.defaultBlockState(), 3);
-        level.setBlock(base.offset(3, 2, 0), Blocks.AIR.defaultBlockState(), 3);
-        if (tier >= 1) {
-            level.setBlock(base.offset(3, 1, 3), Blocks.CRAFTING_TABLE.defaultBlockState(), 3);
-            level.setBlock(base.offset(2, 1, 3), Blocks.BARREL.defaultBlockState(), 3);
-        }
-        if (tier >= 2) {
-            level.setBlock(base.offset(4, 1, 3), Blocks.LANTERN.defaultBlockState(), 3);
-            level.setBlock(base.offset(3, 1, 4), Blocks.BOOKSHELF.defaultBlockState(), 3);
-        }
-    }
-
-    private void buildCastleWhenReady(ServerLevel level, WorldMorphState state,
-                                      WorldMorphState.SettlementData settlement) {
-        int population = state.settlements().values().stream()
-                .filter(s -> s.kingdomId().equals(settlement.kingdomId()))
-                .mapToInt(WorldMorphState.SettlementData::population).sum();
-        if (population < 100 || castleBuiltKingdoms.contains(settlement.kingdomId())) return;
-        WorldMorphState.SettlementData capital = state.settlements().values().stream()
-                .filter(s -> s.kingdomId().equals(settlement.kingdomId()))
-                .max(Comparator.comparingInt(WorldMorphState.SettlementData::population)).orElse(null);
-        if (capital == null || !capital.id().equals(settlement.id())) return;
-        if (!state.spendTreasury(settlement.kingdomId(), 250, "castle construction")) return;
-
-        BlockPos base = capital.center().offset(12, 0, 12);
-        var stone = Blocks.STONE_BRICKS.defaultBlockState();
-        var dark = Blocks.DEEPSLATE_BRICKS.defaultBlockState();
-        for (int x = 0; x < 25; x++) for (int z = 0; z < 25; z++) {
-            boolean edge = x == 0 || x == 24 || z == 0 || z == 24;
-            if (edge) {
-                for (int y = 0; y < 5; y++) {
-                    if (z == 0 && x >= 10 && x <= 14 && y < 3) continue;
-                    level.setBlock(base.offset(x, y, z), stone, 3);
-                }
-                if ((x + z) % 2 == 0) level.setBlock(base.offset(x, 5, z), dark, 3);
-            } else if (x >= 8 && x <= 16 && z >= 8 && z <= 16) {
-                if (x == 8 || x == 16 || z == 8 || z == 16) {
-                    for (int y = 0; y < 9; y++) level.setBlock(base.offset(x, y, z), stone, 3);
-                }
-            }
-        }
-        int[][] towers = {{0,0},{0,24},{24,0},{24,24}};
-        for (int[] tower : towers) {
-            for (int y = 0; y < 10; y++) for (int dx = 0; dx < 3; dx++) for (int dz = 0; dz < 3; dz++) {
-                boolean edge = dx == 0 || dx == 2 || dz == 0 || dz == 2;
-                if (edge || y == 9) level.setBlock(base.offset(tower[0] + dx - 1, y, tower[1] + dz - 1), y >= 8 ? dark : stone, 3);
-            }
-        }
-        state.history("CASTLE_BUILT", "The growing kingdom built a stone castle at " + capital.name() + ".");
-        castleBuiltKingdoms.add(settlement.kingdomId());
     }
 
     private BlockPos findBuildPos(ServerLevel level, BlockPos center, int index) {
