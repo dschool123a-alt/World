@@ -1,0 +1,1 @@
+package nl.worldmorph.sim; public enum GovernmentType { MONARCHY, COUNCIL, ELECTION, MILITARY_RULE }

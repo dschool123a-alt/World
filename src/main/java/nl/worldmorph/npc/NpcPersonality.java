@@ -1,0 +1,1 @@
+package nl.worldmorph.npc; public enum NpcPersonality { KIND, AMBITIOUS, LOYAL, GREEDY, BRAVE, CAUTIOUS, PEACEFUL, AGGRESSIVE, HARDWORKING, LAZY }
