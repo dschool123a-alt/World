@@ -3,7 +3,8 @@ package nl.worldmorph.sim;
 import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -48,6 +49,8 @@ public final class ConstructionProjectManager {
     private final Set<UUID> librarySettlements = new HashSet<>();
     private final Set<UUID> townHallSettlements = new HashSet<>();
     private final Set<UUID> farmSettlements = new HashSet<>();
+    /** Construction stock is earned by physically mining nearby world blocks; nothing is spawned. */
+    private final Map<UUID, Map<String, Integer>> minedMaterials = new HashMap<>();
     private static final int[] CASTLE_POPULATION = {100, 200, 350, 500, 750};
     private static final int[] CASTLE_COST = {250, 400, 650, 900, 1300};
 
@@ -222,8 +225,17 @@ public final class ConstructionProjectManager {
 
         int placed = 0;
         while (project.index < project.blocks.size() && placed < 1) {
-            Placement placement = project.blocks.get(project.index++);
+            Placement placement = project.blocks.get(project.index);
+            if (placement.state().isAir()) { project.index++; continue; }
+            String material = materialKey(placement.state());
+            if (!hasMaterial(project.settlementId, material)) {
+                mineForConstruction(level, project, builders);
+                project.cooldown = 10;
+                return;
+            }
+            project.index++;
             if (level.getBlockState(placement.pos()).isAir() || level.getBlockState(placement.pos()).canBeReplaced()) {
+                consumeMaterial(project.settlementId, material);
                 level.setBlock(placement.pos(), placement.state(), 3);
                 placed++;
             }
@@ -267,12 +279,50 @@ public final class ConstructionProjectManager {
         return settlement == null ? 0 : settlement.population();
     }
 
-    private boolean isCitizenBuilder(Villager villager, Project project, NpcManager npcs) {
+    private boolean isCitizenBuilder(Villager villager, Project project, WorldMorphState state, NpcManager npcs) {
         NpcProfile profile = npcs.get(villager.getUUID());
-        return profile != null && profile.alive()
-                && project.settlementId.equals(profile.settlementId())
-                && (project.kind != Kind.CASTLE
-                    && (projectPopulation(state, project.settlementId) < 50 || "BUILDER".equals(profile.job())));
+        if (profile == null || !profile.alive() || !project.settlementId.equals(profile.settlementId())) return false;
+        return projectPopulation(state, project.settlementId) < 50 || "BUILDER".equals(profile.job());
+    }
+
+    private boolean hasMaterial(UUID settlementId, String material) {
+        return material == null || minedMaterials.getOrDefault(settlementId, Map.of()).getOrDefault(material, 0) > 0;
+    }
+
+    private void consumeMaterial(UUID settlementId, String material) {
+        if (material == null) return;
+        Map<String, Integer> stock = minedMaterials.get(settlementId);
+        if (stock == null) return;
+        stock.computeIfPresent(material, (k, v) -> v > 1 ? v - 1 : null);
+    }
+
+    private void mineForConstruction(ServerLevel level, Project project, List<Villager> builders) {
+        String needed = project.index < project.blocks.size() ? materialKey(project.blocks.get(project.index).state()) : null;
+        if (needed == null) return;
+        for (Villager villager : builders) {
+            BlockPos origin = villager.blockPosition();
+            for (int dx = -5; dx <= 5; dx++) for (int dy = -2; dy <= 3; dy++) for (int dz = -5; dz <= 5; dz++) {
+                BlockPos pos = origin.offset(dx, dy, dz);
+                BlockState found = level.getBlockState(pos);
+                if (!needed.equals(materialKey(found)) || found.isAir()) continue;
+                level.destroyBlock(pos, false);
+                minedMaterials.computeIfAbsent(project.settlementId, k -> new HashMap<>()).merge(needed, 1, Integer::sum);
+                return;
+            }
+        }
+    }
+
+    private String materialKey(BlockState state) {
+        String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        if (id.contains("log") || id.endsWith("_planks") || id.contains("wood") || id.contains("fence") || id.contains("stairs") || id.contains("slab") || id.contains("bookshelf")) return "WOOD";
+        if (id.equals("stone") || id.contains("cobblestone") || id.contains("stone_brick") || id.contains("andesite") || id.contains("diorite") || id.contains("granite") || id.contains("deepslate") || id.equals("polished_deepslate")) return "STONE";
+        if (id.equals("sand") || id.contains("sandstone")) return "SAND";
+        if (id.equals("glass")) return "GLASS";
+        if (id.equals("iron_ore") || id.equals("deepslate_iron_ore") || id.equals("iron_block")) return "IRON";
+        if (id.equals("gold_ore") || id.equals("deepslate_gold_ore") || id.equals("gold_block")) return "GOLD";
+        if (id.equals("dirt") || id.equals("grass_block") || id.equals("coarse_dirt") || id.equals("farmland")) return "EARTH";
+        if (id.equals("wool") || id.endsWith("_wool")) return "WOOL";
+        return null;
     }
 
     private int historyCastlePhase(WorldMorphState state, UUID kingdomId) {
@@ -302,7 +352,7 @@ public final class ConstructionProjectManager {
     private List<Placement> marketPlan(BlockPos b) {
         List<Placement> o=new ArrayList<>();
         for(int x=-1;x<=1;x++) for(int z=-1;z<=1;z++) add(o,b.offset(x*4,0,z*4),state(Blocks.SPRUCE_PLANKS));
-        for(int x=-1;x<=1;x++) for(int z=-1;z<=1;z++) { add(o,b.offset(x*4,1,z*4),state(Blocks.OAK_FENCE)); add(o,b.offset(x*4,2,z*4),state(Blocks.WHITE_WOOL)); }
+        for(int x=-1;x<=1;x++) for(int z=-1;z<=1;z++) { add(o,b.offset(x*4,1,z*4),state(Blocks.OAK_FENCE)); add(o,b.offset(x*4,2,z*4),state(Blocks.OAK_PLANKS)); }
         return o;
     }
     private List<Placement> blacksmithPlan(BlockPos b){ return boxPlan(b,state(Blocks.COBBLESTONE),state(Blocks.STONE_BRICKS),state(Blocks.SPRUCE_PLANKS),7,7,3); }
