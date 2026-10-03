@@ -45,6 +45,17 @@ class WorldEventSimulatorTest {
         assertTrue(state.settlements().get(settlement.id()).population() >= 0);
     }
 
+    @Test void dailyBoundaryEmitsOneEventForEachSettlement() {
+        WorldMorphState state = new WorldMorphState();
+        var kingdom = state.createKingdom("Testland", UUID.randomUUID());
+        state.createSettlement("Tickford", new BlockPos(0, 64, 0), kingdom.id());
+        state.createSettlement("Millford", new BlockPos(40, 64, 40), kingdom.id());
+        for (int i = 0; i < 24_000; i++) state.tick();
+        var events = new WorldEventManager();
+        new WorldEventSimulator(events, new SettlementNeedsManager(), new EconomyManager()).tick(state);
+        assertEquals(2, events.recent().size());
+    }
+
     @Test void eventTickDoesNothingBeforeDailyBoundary() {
         WorldMorphState state = new WorldMorphState();
         var kingdom = state.createKingdom("Testland", UUID.randomUUID());
