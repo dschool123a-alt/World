@@ -61,7 +61,7 @@ public final class WorldMorph implements ModInitializer {
       var player=c.getSource().getPlayerOrException();
       try {
        var id=java.util.UUID.fromString(StringArgumentType.getString(c,"npc"));
-       boolean ok=SIMULATION.dayOneArrival().build(c.getSource().getLevel(),WorldMorphStateAccess.get(c.getSource().getLevel()),player,id);
+       boolean ok=SIMULATION.dayOneArrival().build(c.getSource().getLevel(),WorldMorphStateAccess.get(c.getSource().getLevel()),SIMULATION.npcs(),player,id);
        if(ok)c.getSource().sendSuccess(()->Component.literal("Your first settlement has been founded."),true);
        return ok?1:0;
       } catch(IllegalArgumentException ex){return 0;}
