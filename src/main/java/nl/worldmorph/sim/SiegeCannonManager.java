@@ -15,7 +15,7 @@ import net.minecraft.world.level.block.Blocks;
  * structures; firing spends a shot and creates a controlled in-game blast.
  */
 public final class SiegeCannonManager {
-    public record Cannon(UUID owner, BlockPos position, int shotsFired) {}
+    public record Cannon(UUID owner, BlockPos position, Direction facing, int shotsFired) {}
     private final Map<UUID, Cannon> cannons = new LinkedHashMap<>();
 
     public Cannon build(ServerLevel level, UUID owner, BlockPos origin, Direction facing) {
@@ -23,8 +23,8 @@ public final class SiegeCannonManager {
         Direction right = forward.getClockWise();
         for (int x = -1; x <= 1; x++) {
             for (int z = 0; z <= 2; z++) {
-                BlockPos p = origin.offset(right.getStepX() * x, -1, forward.getStepZ() * z)
-                    .offset(0, 0, 0);
+                BlockPos p = origin.offset(right.getStepX() * x + forward.getStepX() * z, -1,
+                    right.getStepZ() * x + forward.getStepZ() * z);
                 level.setBlockAndUpdate(p, Blocks.STONE_BRICKS.defaultBlockState());
             }
         }
@@ -34,7 +34,7 @@ public final class SiegeCannonManager {
             BlockPos p = origin.relative(forward, z).above();
             level.setBlockAndUpdate(p, Blocks.IRON_BARS.defaultBlockState());
         }
-        Cannon cannon = new Cannon(owner, origin, 0);
+        Cannon cannon = new Cannon(owner, origin, forward, 0);
         cannons.put(owner, cannon);
         return cannon;
     }
@@ -46,11 +46,11 @@ public final class SiegeCannonManager {
     public boolean fire(ServerLevel level, Entity shooter, UUID owner) {
         Cannon cannon = cannons.get(owner);
         if (cannon == null) return false;
-        BlockPos p = cannon.position().relative(Direction.SOUTH, 3).above();
+        BlockPos p = cannon.position().relative(cannon.facing(), 4).above();
         // Use a TNT-style Minecraft explosion, not a real-world weapon simulation.
         level.explode(shooter, p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5,
             3.0F, Level.ExplosionInteraction.TNT);
-        cannons.put(owner, new Cannon(owner, cannon.position(), cannon.shotsFired() + 1));
+        cannons.put(owner, new Cannon(owner, cannon.position(), cannon.facing(), cannon.shotsFired() + 1));
         return true;
     }
 
