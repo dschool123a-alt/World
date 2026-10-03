@@ -35,7 +35,8 @@ public final class Civilization100Manager {
             m.treasury = kingdom.treasury();
             m.tax = kingdom.taxRate();
             m.prosperity = prosperity.getOrDefault(kingdom.id(), 50);
-            m.legitimacy = legitimacy.getOrDefault(kingdom.id(), 60);\n            m.government = kingdom.government();
+            m.legitimacy = legitimacy.getOrDefault(kingdom.id(), 60);
+            m.government = kingdom.government();
 
             for (Rule rule : Rule.values()) apply(rule, m);
 
@@ -58,7 +59,12 @@ public final class Civilization100Manager {
                 if (tick % WEEK == 0) weeklySettlementReport(state, s, m);
             }
 
-            if (m.populationDelta != 0 && !settlements.isEmpty()) {\n                WorldMorphState.SettlementData target = settlements.get(0);\n                state.updateSettlement(target.withPopulation(target.population() + m.populationDelta));\n            }\n\n            localTreasuries.put(kingdom.id(),
+            if (m.populationDelta != 0 && !settlements.isEmpty()) {
+                WorldMorphState.SettlementData target = settlements.get(0);
+                state.updateSettlement(target.withPopulation(target.population() + m.populationDelta));
+            }
+
+            localTreasuries.put(kingdom.id(),
                     localTreasuries.getOrDefault(kingdom.id(), 0) + Math.max(0, m.localTax));
             if (tick % WEEK == 0) weeklyKingdomReport(state, kingdom, m, newTreasury, newStability);
         }
