@@ -4,6 +4,8 @@ import java.util.*;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.core.BlockPos;
@@ -62,9 +64,11 @@ public final class DayOneArrivalManager {
 
         String[] names = {"Settler", "Builder", "Farmer"};
         for (int i = 0; i < 3; i++) {
-            Villager villager = net.minecraft.world.entity.EntityType.VILLAGER.create(level, EntitySpawnReason.EVENT);
+            var type = BuiltInRegistries.ENTITY_TYPE.get(Identifier.fromNamespaceAndPath("minecraft", "villager")).orElse(null);
+            if (type == null) continue;
+            Villager villager = (Villager) type.value().create(level, EntitySpawnReason.EVENT);
             if (villager == null) continue;
-            villager.moveTo(pos.getX() + i * 1.5, pos.getY(), pos.getZ(), 0, 0);
+            villager.setPos(pos.getX() + i * 1.5, pos.getY(), pos.getZ());
             villager.setCustomName(net.minecraft.network.chat.Component.literal(names[i]));
             villager.setCustomNameVisible(true);
             villager.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), EntitySpawnReason.EVENT, null);
