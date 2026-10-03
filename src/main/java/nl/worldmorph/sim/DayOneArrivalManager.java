@@ -11,6 +11,7 @@ import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.Heightmap;
 import nl.worldmorph.npc.NpcManager;
 import nl.worldmorph.npc.NpcProfile;
 import nl.worldmorph.data.WorldMorphState;
@@ -130,9 +131,23 @@ public final class DayOneArrivalManager {
     }
 
     private BlockPos findResource(ServerLevel level, BlockPos origin, net.minecraft.world.level.block.Block block) {
-        for (int r=2; r<=12; r++) for (int dx=-r; dx<=r; dx++) for (int dz=-r; dz<=r; dz++) {
-            BlockPos p = origin.offset(dx, 0, dz);
-            for (int y=-2; y<=2; y++) { BlockPos q=p.above(y); if (level.getBlockState(q).is(block)) return q; }
+        for (int r = 2; r <= 12; r++) {
+            for (int dx = -r; dx <= r; dx++) for (int dz = -r; dz <= r; dz++) {
+                int x = origin.getX() + dx, z = origin.getZ() + dz;
+                if (block == Blocks.STONE) {
+                    int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                    BlockPos surface = new BlockPos(x, surfaceY, z);
+                    if (level.getBlockState(surface).is(Blocks.STONE)
+                            && level.getBlockState(surface.above()).isAir()) return surface;
+                } else {
+                    BlockPos p = new BlockPos(x, origin.getY(), z);
+                    for (int y = -1; y <= 5; y++) {
+                        BlockPos target = p.above(y);
+                        if (level.getBlockState(target).is(block)
+                                && level.getBlockState(target.above()).isAir()) return target;
+                    }
+                }
+            }
         }
         return null;
     }
