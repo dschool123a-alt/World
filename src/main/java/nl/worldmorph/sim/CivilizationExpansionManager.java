@@ -3,8 +3,10 @@ package nl.worldmorph.sim;
 import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.level.Heightmap;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.network.chat.Component;
@@ -208,19 +210,19 @@ public final class CivilizationExpansionManager {
         for (NpcProfile p : citizens(npcs, s.id())) {
             if (!p.alive()) continue;
             Entity existing = level.getEntity(p.id());
-            if (existing instanceof Villager villager) {
-                villager.setCustomName(Component.literal(p.name()));
-                villager.setCustomNameVisible(true);
-                if (p.age() < 5) villager.setBaby(true);
+            if (existing != null && existing.isAlive()) {
+                existing.setCustomName(Component.literal(p.name()));
+                existing.setCustomNameVisible(true);
                 continue;
             }
             BlockPos pos = spawnPos(level, s.center(), p.id());
-            Villager villager = new Villager(net.minecraft.world.entity.EntityType.VILLAGER, level);
+            var type = BuiltInRegistries.ENTITY_TYPE.get(Identifier.fromNamespaceAndPath("minecraft", "villager")).orElseThrow();
+            Entity villager = type.value().create(level, EntitySpawnReason.COMMAND);
+            if (villager == null) continue;
             villager.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, 0, 0);
             villager.setUUID(p.id());
             villager.setCustomName(Component.literal(p.name()));
             villager.setCustomNameVisible(true);
-            if (p.age() < 5) villager.setBaby(true);
             level.addFreshEntity(villager);
             p.addMemory("SPAWNED_IN_WORLD", null, state.getSimulationTick(), 2);
         }
