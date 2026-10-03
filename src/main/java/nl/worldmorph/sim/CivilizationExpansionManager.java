@@ -404,13 +404,9 @@ public final class CivilizationExpansionManager {
         state.history("MIGRATION", migrant.name() + " moved from " + s.name() + " to " + target.name());
     }
 
-    // 48-50: every mature settlement gets a tiny physical civic monument.
+    // 48-50: mature settlements queue a monument; villagers place every block.
     private void monument(ServerLevel level, WorldMorphState.SettlementData s, WorldMorphState state) {
-        if (s.population() < 12) return;
-        BlockPos base = s.center().above();
-        for (int y = 0; y < 3; y++) level.setBlock(base.above(y), Blocks.STONE_BRICKS.defaultBlockState(), 3);
-        level.setBlock(base.above(3), Blocks.GOLD_BLOCK.defaultBlockState(), 3);
-        state.history("MONUMENT_RAISED", s.name() + " raised a civic monument");
+        constructionProjects.requestMonument(level, s);
     }
 
     private BlockPos findBuildPos(ServerLevel level, BlockPos center, int index) {
