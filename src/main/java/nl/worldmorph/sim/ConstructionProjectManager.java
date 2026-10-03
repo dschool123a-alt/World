@@ -16,7 +16,7 @@ import nl.worldmorph.npc.NpcProfile;
  * Projects are serialized through a queue so separate buildings do not overlap in progress.
  */
 public final class ConstructionProjectManager {
-    private enum Kind { HOUSE, BANK, CASTLE, MONUMENT, ROAD, WALL }
+    private enum Kind { HOUSE, BANK, CASTLE, MONUMENT, ROAD, WALL, MARKET, BLACKSMITH, LIBRARY, TOWN_HALL, FARM }
     private record Placement(BlockPos pos, BlockState state) {}
     private static final class Project {
         final Kind kind;
@@ -43,6 +43,11 @@ public final class ConstructionProjectManager {
     private final Set<UUID> bankSettlements = new HashSet<>();
     private final Set<UUID> roadSettlements = new HashSet<>();
     private final Set<UUID> wallSettlements = new HashSet<>();
+    private final Set<UUID> marketSettlements = new HashSet<>();
+    private final Set<UUID> blacksmithSettlements = new HashSet<>();
+    private final Set<UUID> librarySettlements = new HashSet<>();
+    private final Set<UUID> townHallSettlements = new HashSet<>();
+    private final Set<UUID> farmSettlements = new HashSet<>();
     private static final int[] CASTLE_POPULATION = {100, 200, 350, 500, 750};
     private static final int[] CASTLE_COST = {250, 400, 650, 900, 1300};
 
@@ -110,6 +115,27 @@ public final class ConstructionProjectManager {
         queue.add(new Project(Kind.BANK, settlement.id(), settlement.kingdomId(),
                 settlement.name() + " bank", base, 0, bankPlan(base)));
         state.history("BANK_ORDERED", "Settlement " + settlement.id() + " ordered citizens to build a bank for tax administration.");
+    }
+
+    public void requestVillageBuildingsIfReady(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData s) {
+        int p=s.population();
+        if (p>=12 && !marketSettlements.contains(s.id())) queueSimpleBuilding(level,state,s,Kind.MARKET,s.center().offset(10,0,-6),marketPlan(s.center().offset(10,0,-6)),marketSettlements,"MARKET");
+        if (p>=20 && !blacksmithSettlements.contains(s.id())) queueSimpleBuilding(level,state,s,Kind.BLACKSMITH,s.center().offset(-10,0,6),blacksmithPlan(s.center().offset(-10,0,6)),blacksmithSettlements,"BLACKSMITH");
+        if (p>=30 && !librarySettlements.contains(s.id())) queueSimpleBuilding(level,state,s,Kind.LIBRARY,s.center().offset(10,0,7),libraryPlan(s.center().offset(10,0,7)),librarySettlements,"LIBRARY");
+        if (p>=40 && !townHallSettlements.contains(s.id())) queueSimpleBuilding(level,state,s,Kind.TOWN_HALL,s.center().offset(-10,0,-7),townHallPlan(s.center().offset(-10,0,-7)),townHallSettlements,"TOWN_HALL");
+        if (p>=8 && !farmSettlements.contains(s.id())) queueSimpleBuilding(level,state,s,Kind.FARM,s.center().offset(0,0,14),farmPlan(s.center().offset(0,0,14)),farmSettlements,"FARM");
+    }
+
+    private void queueSimpleBuilding(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData s,
+                                     Kind kind, BlockPos base, List<Placement> plan, Set<UUID> registry, String label) {
+        boolean built=state.history().stream().anyMatch(e->e.type().equals(label+"_BUILT")&&e.description().contains(s.id().toString()));
+        boolean queued=queue.stream().anyMatch(p->p.kind==kind&&p.settlementId.equals(s.id()));
+        if(built||queued)return;
+        int y=level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,base.getX(),base.getZ());
+        base=new BlockPos(base.getX(),y,base.getZ());
+        queue.add(new Project(kind,s.id(),s.kingdomId(),s.name()+" "+label.toLowerCase(),base,0,plan));
+        registry.add(s.id());
+        state.history(label+"_ORDERED","Citizens of "+s.name()+" started building the "+label.toLowerCase()+".");
     }
 
     public void requestMonument(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
@@ -212,6 +238,10 @@ public final class ConstructionProjectManager {
                 queuedCastlePhases.remove(project.kingdomId + ":" + project.castlePhase);
                 state.history("CASTLE_PHASE_" + project.castlePhase,
                         "Kingdom " + project.kingdomId + ": " + project.name + " completed castle phase " + project.castlePhase + ".");
+            } else if (project.kind == Kind.MARKET || project.kind == Kind.BLACKSMITH
+                    || project.kind == Kind.LIBRARY || project.kind == Kind.TOWN_HALL || project.kind == Kind.FARM) {
+                String type = project.kind.name() + "_BUILT";
+                state.history(type, "Settlement " + project.settlementId + ": " + project.name + " was completed block by block by citizens.");
             } else {
                 monumentSettlements.add(project.settlementId);
                 state.history("MONUMENT_RAISED", "Settlement " + project.settlementId + ": " + project.name + " was built block by block by villagers.");
@@ -236,6 +266,30 @@ public final class ConstructionProjectManager {
         }
         return max;
     }
+
+    private List<Placement> boxPlan(BlockPos b, BlockState floor, BlockState wall, BlockState roof, int w, int d, int h) {
+        List<Placement> out=new ArrayList<>();
+        for(int x=0;x<w;x++) for(int z=0;z<d;z++) add(out,b.offset(x,0,z),floor);
+        for(int y=1;y<=h;y++) for(int x=0;x<w;x++) for(int z=0;z<d;z++) {
+            if(x!=0&&x!=w-1&&z!=0&&z!=d-1) continue;
+            boolean door=z==0&&x==w/2&&y<=2;
+            boolean window=y==2&&((z==0||z==d-1)&&(x==1||x==w-2));
+            add(out,b.offset(x,y,z),door?state(Blocks.AIR):window?state(Blocks.GLASS_PANE):wall);
+        }
+        for(int x=-1;x<=w;x++) for(int z=-1;z<=d;z++)
+            if(x==-1||x==w||z==-1||z==d) add(out,b.offset(x,h+1,z),roof);
+        return out;
+    }
+    private List<Placement> marketPlan(BlockPos b) {
+        List<Placement> o=new ArrayList<>();
+        for(int x=-1;x<=1;x++) for(int z=-1;z<=1;z++) add(o,b.offset(x*4,0,z*4),state(Blocks.SPRUCE_PLANKS));
+        for(int x=-1;x<=1;x++) for(int z=-1;z<=1;z++) { add(o,b.offset(x*4,1,z*4),state(Blocks.OAK_FENCE)); add(o,b.offset(x*4,2,z*4),state(Blocks.WHITE_WOOL)); }
+        return o;
+    }
+    private List<Placement> blacksmithPlan(BlockPos b){ return boxPlan(b,state(Blocks.COBBLESTONE),state(Blocks.STONE_BRICKS),state(Blocks.SPRUCE_PLANKS),7,7,3); }
+    private List<Placement> libraryPlan(BlockPos b){ List<Placement> o=boxPlan(b,state(Blocks.OAK_PLANKS),state(Blocks.SPRUCE_PLANKS),state(Blocks.DARK_OAK_PLANKS),9,7,4); add(o,b.offset(4,1,3),state(Blocks.BOOKSHELF)); add(o,b.offset(3,1,3),state(Blocks.LECTERN)); return o; }
+    private List<Placement> townHallPlan(BlockPos b){ List<Placement> o=boxPlan(b,state(Blocks.STONE_BRICKS),state(Blocks.OAK_LOG),state(Blocks.SPRUCE_PLANKS),11,9,4); add(o,b.offset(5,1,4),state(Blocks.BELL)); add(o,b.offset(5,5,4),state(Blocks.LANTERN)); return o; }
+    private List<Placement> farmPlan(BlockPos b){ List<Placement> o=new ArrayList<>(); for(int x=0;x<15;x++) for(int z=0;z<9;z++) { if(x==7) add(o,b.offset(x,0,z),state(Blocks.WATER)); else add(o,b.offset(x,0,z),state(Blocks.FARMLAND)); } for(int x=0;x<15;x+=2) add(o,b.offset(x,1,0),state(Blocks.OAK_FENCE)); add(o,b.offset(7,1,4),state(Blocks.WATER)); return o; }
 
     private List<Placement> bankPlan(BlockPos b) {
         List<Placement> out = new ArrayList<>();
