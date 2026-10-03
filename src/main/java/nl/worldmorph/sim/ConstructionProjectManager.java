@@ -262,11 +262,17 @@ public final class ConstructionProjectManager {
         }
     }
 
+    private int projectPopulation(WorldMorphState state, UUID settlementId) {
+        WorldMorphState.SettlementData settlement = state.settlements().get(settlementId);
+        return settlement == null ? 0 : settlement.population();
+    }
+
     private boolean isCitizenBuilder(Villager villager, Project project, NpcManager npcs) {
         NpcProfile profile = npcs.get(villager.getUUID());
         return profile != null && profile.alive()
                 && project.settlementId.equals(profile.settlementId())
-                && "BUILDER".equals(profile.job());
+                && (project.kind != Kind.CASTLE
+                    && (projectPopulation(state, project.settlementId) < 50 || "BUILDER".equals(profile.job())));
     }
 
     private int historyCastlePhase(WorldMorphState state, UUID kingdomId) {
