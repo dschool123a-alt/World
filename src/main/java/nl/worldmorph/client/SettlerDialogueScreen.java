@@ -26,6 +26,8 @@ public final class SettlerDialogueScreen extends Screen {
             .bounds(left + 25, top + 100, 280, 22).build());
         addRenderableWidget(Button.builder(Component.literal("Wait here"), b -> send("wait"))
             .bounds(left + 25, top + 128, 135, 22).build());
+        addRenderableWidget(Button.builder(Component.literal("I found a place!"), b -> send("build"))
+            .bounds(left + 25, top + 156, 135, 22).build());
         addRenderableWidget(Button.builder(Component.literal("Maybe later"), b -> onClose())
             .bounds(left + 170, top + 128, 135, 22).build());
     }
@@ -41,7 +43,7 @@ public final class SettlerDialogueScreen extends Screen {
         this.renderBackground(graphics, mouseX, mouseY, delta);
         int left = (this.width - 330) / 2;
         int top = this.height / 2 - 95;
-        graphics.fill(left, top, left + 330, top + 175, 0xE8101016);
+        graphics.fill(left, top, left + 330, top + 203, 0xE8101016);
         graphics.fill(left + 2, top + 2, left + 328, top + 4, 0xFFD6B36A);
         graphics.drawCenteredString(this.font, Component.literal(npcName), this.width / 2, top + 18, 0xFFF1D7A1);
         graphics.drawCenteredString(this.font, Component.literal("A new beginning"), this.width / 2, top + 40, 0xFFAAAAAA);
