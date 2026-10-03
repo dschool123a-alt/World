@@ -288,7 +288,8 @@ public final class CivilizationExpansionManager {
         int kingdomPopulation = state.settlements().values().stream()
                 .filter(x -> x.kingdomId().equals(s.kingdomId()))
                 .mapToInt(WorldMorphState.SettlementData::population).sum();
-        buildHouse(level, target, kingdomPopulation >= 50 ? 2 : kingdomPopulation >= 20 ? 1 : 0);
+        int tier = kingdomPopulation >= 50 ? 2 : kingdomPopulation >= 20 ? 1 : 0;
+        constructionProjects.requestHouse(child, target, tier);
     }
 
     // 39-50: lightweight long-term systems keep mature settlements from becoming static.
