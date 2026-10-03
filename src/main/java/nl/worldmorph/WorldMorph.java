@@ -38,6 +38,35 @@ public final class WorldMorph implements ModInitializer {
  private static void registerCommands(CommandDispatcher<CommandSourceStack> d){
   var root=Commands.literal("worldmorph");
   root.then(Commands.literal("test").executes(c->{c.getSource().sendSuccess(()->Component.literal("WorldMorph OK - simulation running."),false);return 1;}));
+  root.then(Commands.literal("arrival")
+    .then(Commands.literal("follow").then(Commands.argument("npc",StringArgumentType.word()).executes(c->{
+      var player=c.getSource().getPlayerOrException();
+      try {
+       var id=java.util.UUID.fromString(StringArgumentType.getString(c,"npc"));
+       boolean ok=SIMULATION.dayOneArrival().follow(c.getSource().getLevel(),player,id);
+       if(ok)c.getSource().sendSuccess(()->Component.literal("The settler is coming with you."),false);
+       else c.getSource().sendFailure(Component.literal("That settler is no longer available."));
+       return ok?1:0;
+      } catch(IllegalArgumentException ex){return 0;}
+    })))
+    .then(Commands.literal("wait").then(Commands.argument("npc",StringArgumentType.word()).executes(c->{
+      try {
+       var id=java.util.UUID.fromString(StringArgumentType.getString(c,"npc"));
+       boolean ok=SIMULATION.dayOneArrival().wait(id);
+       if(ok)c.getSource().sendSuccess(()->Component.literal("The settler will wait here."),false);
+       return ok?1:0;
+      } catch(IllegalArgumentException ex){return 0;}
+    })))
+    .then(Commands.literal("build").then(Commands.argument("npc",StringArgumentType.word()).executes(c->{
+      var player=c.getSource().getPlayerOrException();
+      try {
+       var id=java.util.UUID.fromString(StringArgumentType.getString(c,"npc"));
+       boolean ok=SIMULATION.dayOneArrival().build(c.getSource().getLevel(),WorldMorphStateAccess.get(c.getSource().getLevel()),player,id);
+       if(ok)c.getSource().sendSuccess(()->Component.literal("Your first settlement has been founded."),true);
+       return ok?1:0;
+      } catch(IllegalArgumentException ex){return 0;}
+    }))));
+
   root.then(Commands.literal("debug").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)).executes(c->{var s=WorldMorphStateAccess.get(c.getSource().getLevel());c.getSource().sendSuccess(()->Component.literal("tick="+s.getSimulationTick()+" | kingdoms="+s.kingdoms().size()+" | settlements="+s.settlements().size()+" | NPCs="+SIMULATION.npcs().size()+" | history="+s.history().size()),false);return 1;}));
   root.then(kingdomCommands()); root.then(orderCommands()); root.then(settlementCommands()); root.then(npcCommands()); root.then(statusCommands()); root.then(eventCommands()); root.then(armyCommands());
   root.then(jobCommands()); root.then(lawCommands()); root.then(taxCommands()); root.then(familyCommands()); root.then(homeCommands());
