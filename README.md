@@ -21,6 +21,11 @@ Commands are registered under `/worldmorph`.
 | `/worldmorph kingdom create <name>` | Found a kingdom; the player becomes its ruler |
 | `/worldmorph kingdom list` | List kingdoms and treasury/stability |
 | `/worldmorph settlement create <name>` | Found a settlement for the player's kingdom when possible |
+| `/worldmorph settlement list` | Show population and the five settlement need scores |
+| `/worldmorph settlement info <name>` | Inspect a settlement and its coordinates/needs |
+| `/worldmorph status` | Show world population, treasury, stability and simulation totals |
+| `/worldmorph event list` | Show the latest world events from this server session |
+| `/worldmorph economy list` | List currently known market prices |
 | `/worldmorph npc spawn <name>` | Spawn a named villager linked to an NPC profile |
 | `/worldmorph npc create <name>` | Create an NPC profile without spawning a villager |
 | `/worldmorph npc list` | List NPC profiles |
@@ -45,6 +50,8 @@ For job and law names, use the enum values shown by the command's error message,
 - NPC age/lifecycle updates, persistent home assignments and civilian job routines
 - Kingdom treasury updates, need-driven population changes, persistent market prices and citizen mood
 - NPC help/refuse interaction state and temporary speech bubbles for spawned villagers
+- Daily settlement events: harvests, shortages, merchant caravans, immigration, outbreaks, storms, discoveries and festivals; events adjust settlement needs, market prices, population and kingdom stability
+- Quick world/settlement diagnostics and market-price listing commands
 - Building project planning, housing capacity, roads, resources, jobs and education data models
 - Government, laws, group reputation, factions, elections, family/dynasty and citizen mood data models
 - Diplomacy, treaties, trade ledger, quests, achievements and history/event models
