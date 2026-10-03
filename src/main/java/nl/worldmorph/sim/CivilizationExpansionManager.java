@@ -406,7 +406,7 @@ public final class CivilizationExpansionManager {
 
     // 48-50: mature settlements queue a monument; villagers place every block.
     private void monument(ServerLevel level, WorldMorphState.SettlementData s, WorldMorphState state) {
-        constructionProjects.requestMonument(level, s);
+        constructionProjects.requestMonument(level, state, s);
     }
 
     private BlockPos findBuildPos(ServerLevel level, BlockPos center, int index) {
