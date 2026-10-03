@@ -35,7 +35,7 @@ public final class CivilizationExpansionManager {
                      MarriageManager marriages, JobManager jobs, ResourceManager resources,
                      TechnologyManager technology, TerritoryManager territory,
                      RoadNetwork roads, HousingManager housing) {
-        constructionProjects.tick(level, state, housing);
+        constructionProjects.tick(level, state, housing, npcs);
         long tick = state.getSimulationTick();
         if (tick % FAST == 0) {
             for (WorldMorphState.SettlementData settlement : List.copyOf(state.settlements().values())) {
