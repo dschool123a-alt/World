@@ -76,6 +76,23 @@ public final class ConstructionProjectManager {
             add(blocks, ground(level, base.getX()+d, base.getZ()), state(Blocks.GRAVEL));
             add(blocks, ground(level, base.getX(), base.getZ()+d), state(Blocks.GRAVEL));
         }
+        // Branches point toward the planned civic buildings so roads grow with the settlement.
+        BlockPos[] destinations = {
+                settlement.center().offset(10,0,-6),
+                settlement.center().offset(-10,0,6),
+                settlement.center().offset(10,0,7),
+                settlement.center().offset(-10,0,-7),
+                settlement.center().offset(0,0,14)
+        };
+        for (BlockPos destination : destinations) {
+            int steps = Math.max(Math.abs(destination.getX()-base.getX()), Math.abs(destination.getZ()-base.getZ()));
+            for (int i=0; i<=steps; i++) {
+                double t = steps == 0 ? 0 : (double)i / steps;
+                int x = (int)Math.round(base.getX() + (destination.getX()-base.getX()) * t);
+                int z = (int)Math.round(base.getZ() + (destination.getZ()-base.getZ()) * t);
+                add(blocks, ground(level,x,z), state(Blocks.GRAVEL));
+            }
+        }
         queue.add(new Project(Kind.ROAD, settlement.id(), settlement.kingdomId(), settlement.name()+" roads", base, 0, blocks));
         roadSettlements.add(settlement.id());
         state.history("ROAD_ORDERED", "Citizens of " + settlement.name() + " started building local roads.");
@@ -95,6 +112,17 @@ public final class ConstructionProjectManager {
             boolean gate = z==-radius && x>=-2 && x<=2;
             for(int h=0;h<4;h++) if(!gate || h>=3) add(blocks, base.offset(x,h,z), state(Blocks.COBBLESTONE));
             if((x+z)%4==0) add(blocks, base.offset(x,4,z), state(Blocks.STONE_BRICK_WALL));
+        }
+        // Four watchtowers make the wall useful for defence and give the settlement a visible landmark.
+        int towerHeight = 7;
+        for (int[] corner : new int[][]{{-radius,-radius},{-radius,radius},{radius,-radius},{radius,radius}}) {
+            for (int y2=0; y2<towerHeight; y2++) {
+                for (int dx=-1; dx<=1; dx++) for (int dz=-1; dz<=1; dz++) {
+                    if (Math.abs(dx)==1 || Math.abs(dz)==1 || y2==towerHeight-1) {
+                        add(blocks, base.offset(corner[0]+dx,y2,corner[1]+dz), state(Blocks.STONE_BRICKS));
+                    }
+                }
+            }
         }
         queue.add(new Project(Kind.WALL, settlement.id(), settlement.kingdomId(), settlement.name()+" walls", base, 0, blocks));
         wallSettlements.add(settlement.id());
