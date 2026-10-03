@@ -203,7 +203,7 @@ public final class CivilizationCommandManager {
             c.sendSuccess(() -> Component.literal("Dead NPC profiles: " + n), false); return 1;
         }));
         root.then(read("jobs", "NPC jobs", (s, c) -> {
-            Map<String, Long> jobs = sim.npcs().profiles().values().stream().filter(npc -> npc.alive()).collect(java.util.stream.Collectors.groupingBy(npc -> npc.job().name(), java.util.stream.Collectors.counting()));
+            Map<String, Long> jobs = sim.npcs().profiles().values().stream().filter(npc -> npc.alive()).collect(java.util.stream.Collectors.groupingBy(npc -> npc.job(), java.util.stream.Collectors.counting()));
             jobs.forEach((job, count) -> c.sendSuccess(() -> Component.literal(job + ": " + count), false));
             return Math.max(1, jobs.size());
         }));
