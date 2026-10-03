@@ -150,7 +150,7 @@ public final class RoyalAdministrationManager {
                 "Royal Messenger");
         Entity horse = create(level, "horse", horseId, origin.center().getX() + 1.5, y, origin.center().getZ() + .5, "Royal Messenger Horse");
         if (rider == null || horse == null) return;
-        rider.startRiding(horse, true);
+        rider.startRiding(horse, true, true);
         npcs.create(riderId, "Royal Messenger").setKingdom(own.id());
         long travel = Math.max(MIN_ASSIGNMENT, roads.travelTicks(origin.center(), destination.center(), true));
         messengers.put(riderId, new Messenger(riderId, horseId, own.id(), target.id(),
@@ -164,8 +164,8 @@ public final class RoyalAdministrationManager {
         rider.setCustomNameVisible(true);
         if (target.leader() != null) {
             ServerPlayer king = level.getServer().getPlayerList().getPlayer(target.leader());
-            if (king != null) king.displayClientMessage(Component.literal(
-                    "A royal messenger arrives: " + m.type() + " — " + m.reason()), false);
+            if (king != null) king.sendSystemMessage(Component.literal(
+                    "A royal messenger arrives: " + m.type() + " — " + m.reason()));
         }
         state.history("LETTER_DELIVERED", "A messenger delivered a " + m.type() + " letter to " + target.name());
     }
