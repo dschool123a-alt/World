@@ -50,7 +50,7 @@ public final class CivilizationExpansionManager {
             for (WorldMorphState.SettlementData settlement : List.copyOf(state.settlements().values())) {
                 syncPhysicalCitizens(level, settlement, state, npcs);
                 growKingdom(level, settlement, state, npcs, families, housing, territory, roads);
-                runAdvancedCycle(level, settlement, state, npcs, resources, housing);
+                runAdvancedCycle(level, state, settlement, npcs, resources, housing);
                 removeDeadCitizens(level, settlement, npcs);
             }
         }
@@ -219,7 +219,7 @@ public final class CivilizationExpansionManager {
             var type = BuiltInRegistries.ENTITY_TYPE.get(Identifier.fromNamespaceAndPath("minecraft", "villager")).orElseThrow();
             Entity villager = type.value().create(level, EntitySpawnReason.COMMAND);
             if (villager == null) continue;
-            villager.moveTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5, 0, 0);
+            villager.setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
             villager.setUUID(p.id());
             villager.setCustomName(Component.literal(p.name()));
             villager.setCustomNameVisible(true);
