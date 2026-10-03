@@ -23,6 +23,8 @@ public final class CivilizationExpansionManager {
     private static final long FAST = 1200;
     private static final long DAILY = 24000;
     private static final int MAX_HOUSE_BUILD = 3;
+    private static final int HOUSE_COST = 25;
+    private static final int ROAD_COST = 10;
     private final Set<UUID> seededSettlements = new HashSet<>();
 
     public void tick(ServerLevel level, WorldMorphState state, NpcManager npcs,
@@ -181,6 +183,8 @@ public final class CivilizationExpansionManager {
         for (int i = 0; i < missing; i++) {
             BlockPos pos = findBuildPos(level, s.center(), housing.get(s.id()).houses() + i + 1);
             if (pos == null) continue;
+            WorldMorphState.KingdomData kingdom = state.kingdoms().get(s.kingdomId());
+            if (kingdom == null || !state.spendTreasury(s.kingdomId(), HOUSE_COST, "house construction")) continue;
             buildHouse(level, pos);
             housing.addHouse(s.id(), 4);
             state.history("HOUSE_BUILT", s.name() + " built a new house");
@@ -192,6 +196,7 @@ public final class CivilizationExpansionManager {
         if (roads.inSettlement(s.id()).isEmpty()) {
             BlockPos a = s.center();
             BlockPos b = s.center().offset(8, 0, 0);
+            if (!state.spendTreasury(s.kingdomId(), ROAD_COST, "road construction")) return;
             roads.build(s.id(), a, b, 50);
             state.history("ROAD_STARTED", s.name() + " started a local road");
         }
