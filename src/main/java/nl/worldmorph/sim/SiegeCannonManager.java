@@ -3,6 +3,8 @@ package nl.worldmorph.sim;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashSet;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -17,6 +19,11 @@ import net.minecraft.world.level.block.Blocks;
 public final class SiegeCannonManager {
     public record Cannon(UUID owner, BlockPos position, Direction facing, int shotsFired) {}
     private final Map<UUID, Cannon> cannons = new LinkedHashMap<>();
+    private final Set<UUID> craftedKits = new HashSet<>();
+
+    public boolean hasCraftedKit(UUID owner) { return craftedKits.contains(owner); }
+    public boolean craftKit(UUID owner) { return craftedKits.add(owner); }
+    public boolean consumeKit(UUID owner) { return craftedKits.remove(owner); }
 
     public Cannon build(ServerLevel level, UUID owner, BlockPos origin, Direction facing) {
         Direction forward = facing.getAxis().isHorizontal() ? facing : Direction.SOUTH;
