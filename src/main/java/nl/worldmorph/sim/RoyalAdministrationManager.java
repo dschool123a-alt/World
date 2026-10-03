@@ -132,6 +132,15 @@ public final class RoyalAdministrationManager {
         if (population(state, kingdom.id()) < UNLOCK_POPULATION) return;
         WorldMorphState.SettlementData capital = capital(state, kingdom.id());
         if (capital == null) return;
+        int population = population(state, kingdom.id());
+        int phase = population >= 750 ? 5 : population >= 500 ? 4 : population >= 350 ? 3 : population >= 200 ? 2 : 1;
+        boolean alreadyOrdered = state.history().stream().anyMatch(e ->
+                e.type().equals("ROYAL_BUILD_ORDER")
+                        && e.description().contains(kingdom.id().toString())
+                        && e.description().contains("phase " + phase));
+        if (!alreadyOrdered) {
+            state.history("ROYAL_BUILD_ORDER", kingdom.name() + " Royal Assistant ordered castle phase " + phase + " construction.");
+        }
         construction.requestCastleIfReady(level, state, capital);
     }
 
