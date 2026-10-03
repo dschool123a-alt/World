@@ -191,7 +191,7 @@ public final class ConstructionProjectManager {
 
         List<Villager> builders = level.getEntitiesOfClass(Villager.class,
                 new net.minecraft.world.phys.AABB(project.base).inflate(48),
-                v -> v.isAlive() && !v.isBaby() && isCitizenBuilder(v, project, npcs)).stream().limit(3).toList();
+                v -> v.isAlive() && !v.isBaby() && isCitizenBuilder(v, project, state, npcs)).stream().limit(3).toList();
         if (builders.isEmpty()) return;
 
         // Construction is performed by actual citizens assigned to the BUILDER job.
