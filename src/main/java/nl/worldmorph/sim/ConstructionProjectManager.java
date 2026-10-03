@@ -68,7 +68,11 @@ public final class ConstructionProjectManager {
                 .filter(s -> s.kingdomId().equals(kingdomId))
                 .max(Comparator.comparingInt(WorldMorphState.SettlementData::population)).orElse(null);
         if (capital == null || !capital.id().equals(settlement.id())) return;
-        if (!state.spendTreasury(kingdomId, CASTLE_COST[phase - 1], "castle phase " + phase)) return;
+        boolean alreadyStarted = state.history().stream().anyMatch(event ->
+                event.type().equals("CASTLE_PHASE_STARTED")
+                        && event.description().contains(kingdomId.toString())
+                        && event.description().contains("phase " + phase + " "));
+        if (!alreadyStarted && !state.spendTreasury(kingdomId, CASTLE_COST[phase - 1], "castle phase " + phase)) return;
         BlockPos castleXZ = capital.center().offset(12, 0, 12);\n        int castleY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, castleXZ.getX(), castleXZ.getZ());\n        BlockPos base = new BlockPos(castleXZ.getX(), castleY, castleXZ.getZ());
         queue.add(new Project(Kind.CASTLE, capital.id(), kingdomId, capital.name() + " castle",
                 base, phase, castlePlan(base, phase)));
