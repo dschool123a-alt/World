@@ -99,7 +99,9 @@ public final class CivilizationExpansionManager {
                 if (marriages.marry(a, b, state.getSimulationTick())) {
                     if (a.familyId() == null) families.found(a, s.id());
                     if (b.familyId() == null) families.found(b, s.id());
+                    UUID mergedFamily = a.familyId();
                     families.merge(a.familyId(), b.familyId(), a.id());
+                    if (mergedFamily != null) families.get(mergedFamily).ifPresent(f -> f.members().forEach(id -> { NpcProfile member = npcs.get(id); if (member != null) member.setFamily(mergedFamily); }));
                     state.history("FAMILY_FORMED", a.name() + " and " + b.name() + " formed a family in " + s.name());
                     break;
                 }
