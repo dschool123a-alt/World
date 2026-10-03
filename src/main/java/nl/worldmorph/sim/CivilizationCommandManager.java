@@ -14,12 +14,14 @@ import java.util.UUID;
 public final class CivilizationCommandManager {
     private CivilizationCommandManager() {}
 
-    public static void register(LiteralArgumentBuilder<CommandSourceStack> root, WorldMorphSimulation sim) {
+    public static LiteralArgumentBuilder<CommandSourceStack> registerRoot(WorldMorphSimulation sim) {
+        var root = Commands.literal("civilization");
         root.then(kingdomCommands());
         root.then(settlementCommands());
         root.then(economyCommands());
         root.then(populationCommands(sim));
         root.then(worldCommands(sim));
+        return root;
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> kingdomCommands() {
