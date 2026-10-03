@@ -28,6 +28,7 @@ public final class CivilizationExpansionManager {
     private final Set<UUID> seededSettlements = new HashSet<>();
     private final Set<UUID> castleBuiltKingdoms = new HashSet<>();
     private final ConstructionProjectManager constructionProjects = new ConstructionProjectManager();
+    public ConstructionProjectManager constructionProjects() { return constructionProjects; }
 
     public void tick(ServerLevel level, WorldMorphState state, NpcManager npcs,
                      FamilyManager families, RelationshipManager relationships,
@@ -47,6 +48,7 @@ public final class CivilizationExpansionManager {
                 advanceTechnology(settlement, state, technology);
                 claimTerritory(settlement, state, territory);
                 buildNeededHomes(level, settlement, npcs, housing, state);
+                constructionProjects.requestBankIfReady(level, state, settlement);
                 maintainRoads(settlement, state, roads);
                 enforcePopulationCap(settlement, state);
             }
