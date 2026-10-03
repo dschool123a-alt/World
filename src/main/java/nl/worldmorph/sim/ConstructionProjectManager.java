@@ -14,7 +14,7 @@ import nl.worldmorph.data.WorldMorphState;
  * Projects are serialized through a queue so separate buildings do not overlap in progress.
  */
 public final class ConstructionProjectManager {
-    private enum Kind { HOUSE, CASTLE }
+    private enum Kind { HOUSE, CASTLE, MONUMENT }
     private record Placement(BlockPos pos, BlockState state) {}
     private static final class Project {
         final Kind kind;
@@ -37,6 +37,7 @@ public final class ConstructionProjectManager {
     private final Map<UUID, Integer> pendingHouses = new HashMap<>();
     private final Map<UUID, Integer> completedCastlePhases = new HashMap<>();
     private final Set<String> queuedCastlePhases = new HashSet<>();
+    private final Set<UUID> monumentSettlements = new HashSet<>();
     private static final int[] CASTLE_POPULATION = {100, 200, 350, 500, 750};
     private static final int[] CASTLE_COST = {250, 400, 650, 900, 1300};
 
@@ -48,6 +49,20 @@ public final class ConstructionProjectManager {
         pendingHouses.merge(settlement.id(), 1, Integer::sum);
         queue.add(new Project(Kind.HOUSE, settlement.id(), settlement.kingdomId(),
                 settlement.name() + " house", base, 0, housePlan(base, tier)));
+    }
+
+    public void requestMonument(ServerLevel level, WorldMorphState.SettlementData settlement) {
+        if (settlement.population() < 12 || monumentSettlements.contains(settlement.id())) return;
+        boolean queued = queue.stream().anyMatch(p -> p.kind == Kind.MONUMENT && p.settlementId.equals(settlement.id()));
+        if (queued) return;
+        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                settlement.center().getX(), settlement.center().getZ());
+        BlockPos base = new BlockPos(settlement.center().getX(), y, settlement.center().getZ());
+        List<Placement> blocks = new ArrayList<>();
+        for (int h = 0; h < 3; h++) add(blocks, base.above(h), state(Blocks.STONE_BRICKS));
+        add(blocks, base.above(3), state(Blocks.GOLD_BLOCK));
+        queue.add(new Project(Kind.MONUMENT, settlement.id(), settlement.kingdomId(),
+                settlement.name() + " monument", base, 0, blocks));
     }
 
     public void requestCastleIfReady(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
@@ -122,11 +137,14 @@ public final class ConstructionProjectManager {
                 pendingHouses.compute(project.settlementId, (id, n) -> Math.max(0, (n == null ? 1 : n) - 1));
                 housing.addHouse(project.settlementId, 4);
                 state.history("HOUSE_BUILT", project.name + " was completed block by block by villagers.");
-            } else {
+            } else if (project.kind == Kind.CASTLE) {
                 completedCastlePhases.put(project.kingdomId, project.castlePhase);
                 queuedCastlePhases.remove(project.kingdomId + ":" + project.castlePhase);
                 state.history("CASTLE_PHASE_" + project.castlePhase,
                         "Kingdom " + project.kingdomId + ": " + project.name + " completed castle phase " + project.castlePhase + ".");
+            } else {
+                monumentSettlements.add(project.settlementId);
+                state.history("MONUMENT_RAISED", project.name + " was built block by block by villagers.");
             }
         }
     }
