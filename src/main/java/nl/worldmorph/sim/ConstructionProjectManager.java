@@ -52,7 +52,7 @@ public final class ConstructionProjectManager {
                 settlement.name() + " house", base, 0, housePlan(base, tier)));
     }
 
-    public void requestCastleIfReady(WorldMorphState state, WorldMorphState.SettlementData settlement) {
+    public void requestCastleIfReady(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
         UUID kingdomId = settlement.kingdomId();
         int population = state.settlements().values().stream()
                 .filter(s -> s.kingdomId().equals(kingdomId))
@@ -69,11 +69,11 @@ public final class ConstructionProjectManager {
                 .max(Comparator.comparingInt(WorldMorphState.SettlementData::population)).orElse(null);
         if (capital == null || !capital.id().equals(settlement.id())) return;
         if (!state.spendTreasury(kingdomId, CASTLE_COST[phase - 1], "castle phase " + phase)) return;
-        BlockPos base = capital.center().offset(12, 0, 12);
+        BlockPos castleXZ = capital.center().offset(12, 0, 12);\n        int castleY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, castleXZ.getX(), castleXZ.getZ());\n        BlockPos base = new BlockPos(castleXZ.getX(), castleY, castleXZ.getZ());
         queue.add(new Project(Kind.CASTLE, capital.id(), kingdomId, capital.name() + " castle",
                 base, phase, castlePlan(base, phase)));
         queuedCastlePhases.add(key);
-        state.history("CASTLE_PHASE_STARTED", "Castle phase " + phase + " construction started for " + capital.name());
+        state.history("CASTLE_PHASE_STARTED", "Kingdom " + kingdomId + ": castle phase " + phase + " construction started for " + capital.name());
     }
 
     public void tick(ServerLevel level, WorldMorphState state, HousingManager housing) {
