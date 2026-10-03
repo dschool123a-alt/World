@@ -3,7 +3,6 @@ package nl.worldmorph.sim;
 import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -38,7 +37,6 @@ public final class ConstructionProjectManager {
     private final Map<UUID, Integer> pendingHouses = new HashMap<>();
     private final Map<UUID, Integer> completedCastlePhases = new HashMap<>();
     private final Set<String> queuedCastlePhases = new HashSet<>();
-    private UUID activeKingdom;
     private static final int[] CASTLE_POPULATION = {100, 200, 350, 500, 750};
     private static final int[] CASTLE_COST = {250, 400, 650, 900, 1300};
 
@@ -73,7 +71,9 @@ public final class ConstructionProjectManager {
                         && event.description().contains(kingdomId.toString())
                         && event.description().contains("phase " + phase + " "));
         if (!alreadyStarted && !state.spendTreasury(kingdomId, CASTLE_COST[phase - 1], "castle phase " + phase)) return;
-        BlockPos castleXZ = capital.center().offset(12, 0, 12);\n        int castleY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, castleXZ.getX(), castleXZ.getZ());\n        BlockPos base = new BlockPos(castleXZ.getX(), castleY, castleXZ.getZ());
+        BlockPos castleXZ = capital.center().offset(12, 0, 12);
+        int castleY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, castleXZ.getX(), castleXZ.getZ());
+        BlockPos base = new BlockPos(castleXZ.getX(), castleY, castleXZ.getZ());
         queue.add(new Project(Kind.CASTLE, capital.id(), kingdomId, capital.name() + " castle",
                 base, phase, castlePlan(base, phase)));
         queuedCastlePhases.add(key);
