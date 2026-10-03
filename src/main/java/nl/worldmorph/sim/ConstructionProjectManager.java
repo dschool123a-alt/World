@@ -126,7 +126,7 @@ public final class ConstructionProjectManager {
                 completedCastlePhases.put(project.kingdomId, project.castlePhase);
                 queuedCastlePhases.remove(project.kingdomId + ":" + project.castlePhase);
                 state.history("CASTLE_PHASE_" + project.castlePhase,
-                        project.name + " completed castle phase " + project.castlePhase + ".");
+                        "Kingdom " + project.kingdomId + ": " + project.name + " completed castle phase " + project.castlePhase + ".");
             }
         }
     }
