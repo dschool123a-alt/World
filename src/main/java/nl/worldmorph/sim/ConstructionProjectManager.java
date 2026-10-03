@@ -8,6 +8,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import nl.worldmorph.data.WorldMorphState;
+import nl.worldmorph.npc.NpcManager;
+import nl.worldmorph.npc.NpcProfile;
 
 /**
  * Places every structure one block at a time while nearby villagers walk to the work site.
@@ -156,14 +158,14 @@ public final class ConstructionProjectManager {
         state.history("CASTLE_PHASE_STARTED", "Kingdom " + kingdomId + ": castle phase " + phase + " construction started for " + capital.name());
     }
 
-    public void tick(ServerLevel level, WorldMorphState state, HousingManager housing) {
+    public void tick(ServerLevel level, WorldMorphState state, HousingManager housing, NpcManager npcs) {
         Project project = queue.peek();
         if (project == null) return;
         if (project.cooldown > 0) { project.cooldown--; return; }
 
         List<Villager> builders = level.getEntitiesOfClass(Villager.class,
                 new net.minecraft.world.phys.AABB(project.base).inflate(48),
-                v -> v.isAlive() && !v.isBaby()).stream().limit(3).toList();
+                v -> v.isAlive() && !v.isBaby() && isCitizenBuilder(v, project, npcs)).stream().limit(3).toList();
         if (builders.isEmpty()) return;
 
         BlockPos staging = project.kind == Kind.HOUSE || project.kind == Kind.BANK
@@ -215,6 +217,13 @@ public final class ConstructionProjectManager {
                 state.history("MONUMENT_RAISED", "Settlement " + project.settlementId + ": " + project.name + " was built block by block by villagers.");
             }
         }
+    }
+
+    private boolean isCitizenBuilder(Villager villager, Project project, NpcManager npcs) {
+        NpcProfile profile = npcs.get(villager.getUUID());
+        return profile != null && profile.alive()
+                && project.settlementId.equals(profile.settlementId())
+                && ("BUILDER".equals(profile.job()) || project.kind != Kind.CASTLE);
     }
 
     private int historyCastlePhase(WorldMorphState state, UUID kingdomId) {
