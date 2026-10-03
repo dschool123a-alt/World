@@ -87,7 +87,7 @@ public final class DayOneArrivalManager {
             if (worker.workCooldown > 0) { worker.workCooldown--; continue; }
             if (worker.phase == Phase.GATHER_WOOD || worker.phase == Phase.GATHER_STONE) {
                 if (worker.target == null || level.getBlockState(worker.target).isAir()) {
-                    worker.target = findResource(level, villager.blockPosition(), worker.phase == Phase.GATHER_WOOD ? Blocks.OAK_LOG : Blocks.STONE);
+                    worker.target = findResource(level, villager.blockPosition(), worker.phase == Phase.GATHER_WOOD);
                 }
                 if (worker.target == null) {
                     worker.workCooldown = 40;
@@ -127,26 +127,40 @@ public final class DayOneArrivalManager {
         }
     }
 
-    private BlockPos findResource(ServerLevel level, BlockPos origin, net.minecraft.world.level.block.Block block) {
-        for (int r = 2; r <= 12; r++) {
+    private BlockPos findResource(ServerLevel level, BlockPos origin, boolean wood) {
+        for (int r = 2; r <= 16; r++) {
             for (int dx = -r; dx <= r; dx++) for (int dz = -r; dz <= r; dz++) {
                 int x = origin.getX() + dx, z = origin.getZ() + dz;
-                if (block == Blocks.STONE) {
+                if (!wood) {
                     int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
                     BlockPos surface = new BlockPos(x, surfaceY, z);
-                    if (level.getBlockState(surface).is(Blocks.STONE)
+                    if (isStoneResource(level.getBlockState(surface))
                             && level.getBlockState(surface.above()).isAir()) return surface;
                 } else {
-                    BlockPos p = new BlockPos(x, origin.getY(), z);
-                    for (int y = -1; y <= 5; y++) {
-                        BlockPos target = p.above(y);
-                        if (level.getBlockState(target).is(block)
+                    int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+                    for (int y = surfaceY; y <= surfaceY + 6; y++) {
+                        BlockPos target = new BlockPos(x, y, z);
+                        if (isWoodResource(level.getBlockState(target))
                                 && level.getBlockState(target.above()).isAir()) return target;
                     }
                 }
             }
         }
         return null;
+    }
+
+    private boolean isWoodResource(net.minecraft.world.level.block.state.BlockState state) {
+        return state.is(Blocks.OAK_LOG) || state.is(Blocks.SPRUCE_LOG)
+                || state.is(Blocks.BIRCH_LOG) || state.is(Blocks.JUNGLE_LOG)
+                || state.is(Blocks.ACACIA_LOG) || state.is(Blocks.DARK_OAK_LOG)
+                || state.is(Blocks.MANGROVE_LOG) || state.is(Blocks.CHERRY_LOG)
+                || state.is(Blocks.PALE_OAK_LOG);
+    }
+
+    private boolean isStoneResource(net.minecraft.world.level.block.state.BlockState state) {
+        return state.is(Blocks.STONE) || state.is(Blocks.ANDESITE)
+                || state.is(Blocks.DIORITE) || state.is(Blocks.GRANITE)
+                || state.is(Blocks.DEEPSLATE);
     }
 
     private BlockPos constructionBlock(int index) {
