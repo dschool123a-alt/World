@@ -9,12 +9,29 @@ import net.minecraft.world.entity.npc.VillagerData;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.entity.npc.VillagerType;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
+import nl.worldmorph.npc.NpcManager;
+import nl.worldmorph.npc.NpcProfile;
 import nl.worldmorph.data.WorldMorphState;
 
 public final class DayOneArrivalManager {
     private boolean arrived;
     private final Map<UUID, UUID> followers = new HashMap<>();
     private final Set<UUID> arrivalGroup = new LinkedHashSet<>();
+    private final Map<UUID, Worker> workers = new HashMap<>();
+    private BlockPos constructionCenter;
+    private UUID settlementId;
+    private int wood;
+    private int stone;
+
+    private enum Phase { FOLLOW, GATHER_WOOD, GATHER_STONE, BUILD }
+    private static final class Worker {
+        Phase phase = Phase.FOLLOW;
+        BlockPos target;
+        int buildIndex;
+        int workCooldown;
+    }
 
     public void tick(ServerLevel level, WorldMorphState state) {
         if (!arrived && state.getSimulationTick() <= 24000) spawnIfReady(level, state);
@@ -59,7 +76,7 @@ public final class DayOneArrivalManager {
         arrived = true;
     }
 
-    public boolean follow(ServerLevel level, ServerPlayer player, UUID npcId) {
+    private void tickConstruction(ServerLevel level, WorldMorphState state) {\n        if (constructionCenter == null || workers.isEmpty()) return;\n        for (var entry : new ArrayList<>(workers.entrySet())) {\n            var entity = level.getEntity(entry.getKey());\n            if (!(entity instanceof Villager villager) || !villager.isAlive()) continue;\n            Worker worker = entry.getValue();\n            if (worker.workCooldown > 0) { worker.workCooldown--; continue; }\n            if (worker.phase == Phase.GATHER_WOOD || worker.phase == Phase.GATHER_STONE) {\n                if (worker.target == null || level.getBlockState(worker.target).isAir()) {\n                    worker.target = findResource(level, villager.blockPosition(), worker.phase == Phase.GATHER_WOOD ? Blocks.OAK_LOG : Blocks.STONE);\n                }\n                if (worker.target == null) { worker.phase = worker.phase == Phase.GATHER_WOOD ? Phase.GATHER_STONE : Phase.BUILD; continue; }\n                if (villager.blockPosition().distSqr(worker.target) > 9) {\n                    villager.getNavigation().moveTo(worker.target.getX()+0.5, worker.target.getY(), worker.target.getZ()+0.5, 1.0D);\n                } else {\n                    level.setBlock(worker.target, Blocks.AIR.defaultBlockState(), 3);\n                    if (worker.phase == Phase.GATHER_WOOD) wood++; else stone++;\n                    worker.target = null; worker.workCooldown = 10;\n                    if (wood >= 12 && stone >= 12) worker.phase = Phase.BUILD;\n                }\n            } else if (worker.phase == Phase.BUILD) {\n                BlockPos site = constructionBlock(worker.buildIndex);\n                if (site == null) {\n                    worker.phase = Phase.BUILD;\n                    continue;\n                }\n                BlockPos workPos = site.below();\n                if (villager.blockPosition().distSqr(workPos) > 9) {\n                    villager.getNavigation().moveTo(workPos.getX()+0.5, workPos.getY(), workPos.getZ()+0.5, 0.9D);\n                } else {\n                    level.setBlock(site, (worker.buildIndex % 5 == 0) ? Blocks.OAK_LOG.defaultBlockState() : Blocks.OAK_PLANKS.defaultBlockState(), 3);\n                    worker.buildIndex++; worker.workCooldown = 6;\n                }\n            }\n        }\n        if (workers.values().stream().allMatch(w -> w.phase == Phase.BUILD) && workers.values().stream().allMatch(w -> w.buildIndex >= 25)) {\n            state.history("DAY_ONE_HOUSES_BUILT", "The first settlers gathered local materials and built their first homes.");\n            workers.clear();\n            constructionCenter = null;\n        }\n    }\n\n    private BlockPos findResource(ServerLevel level, BlockPos origin, net.minecraft.world.level.block.Block block) {\n        for (int r=2; r<=12; r++) for (int dx=-r; dx<=r; dx++) for (int dz=-r; dz<=r; dz++) {\n            BlockPos p = origin.offset(dx, 0, dz);\n            for (int y=-2; y<=2; y++) { BlockPos q=p.above(y); if (level.getBlockState(q).is(block)) return q; }\n        }\n        return null;\n    }\n\n    private BlockPos constructionBlock(int index) {\n        if (constructionCenter == null || index >= 25) return null;\n        int x=index%5, z=index/5;\n        return constructionCenter.offset(x, 0, z);\n    }\n\n    public boolean follow(ServerLevel level, ServerPlayer player, UUID npcId) {
         if (!arrivalGroup.contains(npcId)) return false;
         var entity = level.getEntity(npcId);
         if (!(entity instanceof Villager villager) || !villager.isAlive()) return false;
@@ -77,7 +94,7 @@ public final class DayOneArrivalManager {
         return followers.remove(npcId) != null;
     }
 
-    public boolean build(ServerLevel level, WorldMorphState state, ServerPlayer player, UUID npcId) {
+    public boolean build(ServerLevel level, WorldMorphState state, NpcManager npcs, ServerPlayer player, UUID npcId) {
         var entity = level.getEntity(npcId);
         if (!(entity instanceof Villager villager) || !villager.isAlive()) return false;
         if (!arrivalGroup.contains(npcId)) return false;
