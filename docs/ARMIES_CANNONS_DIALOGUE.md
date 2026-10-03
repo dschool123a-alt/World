@@ -11,11 +11,12 @@ An operator can create NPC profiles and enlist living profiles in the kingdom th
 The current army prototype tracks a kingdom roster and training level. Soldiers are NPC profiles assigned the SOLDIER job; formations, pathfinding, combat AI and persistent army saves are future work.
 
 ## Siege cannon
-- `/worldmorph cannon build` builds the prototype cannon structure.
+- `/worldmorph cannon craft` consumes 3 iron blocks, 8 iron ingots, 4 iron bars, 16 stone bricks and 4 gunpowder to make one cannon kit.
+- `/worldmorph cannon build` places the cannon structure and consumes the crafted kit.
 - `/worldmorph cannon fire` fires a vanilla Minecraft explosion in the cannon's facing direction.
 - `/worldmorph cannon status` reports the tracked cannon.
 
-Cannons currently are not crafting-table craftable yet. A proper craftable cannon kit item, recipe, inventory costs, reload/ammunition and persistent ownership are planned follow-up work; the current build command is a prototype.
+Cannon crafting currently uses an in-game command and inventory costs, not a crafting-table recipe or custom inventory item. Reload/ammunition, persistent ownership and a proper crafting-table recipe remain follow-up work.
 
 ## NPC speech
 - `/worldmorph npc spawn Alex`
