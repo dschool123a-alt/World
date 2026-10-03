@@ -4,10 +4,7 @@ import java.util.*;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntitySpawnReason;
-import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.entity.npc.VillagerData;
-import net.minecraft.world.entity.npc.VillagerProfession;
-import net.minecraft.world.entity.npc.VillagerType;
+import net.minecraft.world.entity.npc.villager.Villager;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
@@ -51,7 +48,7 @@ public final class DayOneArrivalManager {
     }
 
     private void spawnIfReady(ServerLevel level, WorldMorphState state) {
-        long time = level.getDayTime() % 24000L;
+        long time = level.getGameTime() % 24000L;
         if (time < 1000L || time > 12000L) return;
         ServerPlayer player = level.players().stream().filter(p -> !p.isSpectator()).findFirst().orElse(null);
         if (player == null || player.blockPosition().getY() < level.getSeaLevel() - 8) return;
@@ -65,9 +62,9 @@ public final class DayOneArrivalManager {
 
         String[] names = {"Settler", "Builder", "Farmer"};
         for (int i = 0; i < 3; i++) {
-            Villager villager = new Villager(level);
-            villager.moveTo(pos.getX() + i * 1.5, pos.getY() + 1, pos.getZ(), 0, 0);
-            villager.setVillagerData(new VillagerData(VillagerType.PLAINS, VillagerProfession.NONE, 1));
+            Villager villager = net.minecraft.world.entity.EntityType.VILLAGER.create(level, EntitySpawnReason.EVENT);
+            if (villager == null) continue;
+            villager.moveTo(pos.getX() + i * 1.5, pos.getY(), pos.getZ(), 0, 0);
             villager.setCustomName(net.minecraft.network.chat.Component.literal(names[i]));
             villager.setCustomNameVisible(true);
             villager.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), EntitySpawnReason.EVENT, null);
