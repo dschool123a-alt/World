@@ -14,14 +14,19 @@ import nl.worldmorph.data.WorldMorphState;
 public final class DayOneArrivalManager {
     private boolean arrived;
     private final Map<UUID, UUID> followers = new HashMap<>();
+    private final Set<UUID> arrivalGroup = new LinkedHashSet<>();
 
     public void tick(ServerLevel level, WorldMorphState state) {
         if (!arrived && state.getSimulationTick() <= 24000) spawnIfReady(level, state);
-        for (var entry : followers.entrySet()) {
+        for (var entry : new ArrayList<>(followers.entrySet())) {
             var entity = level.getEntity(entry.getKey());
             var player = level.getServer().getPlayerList().getPlayer(entry.getValue());
             if (entity instanceof Villager villager && player != null && villager.isAlive()) {
-                villager.getNavigation().moveTo(player, 1.05D);
+                double distance = villager.distanceTo(player);
+                if (distance > 3.0D) villager.getNavigation().moveTo(player, 1.15D);
+                else villager.getNavigation().stop();
+            } else {
+                followers.remove(entry.getKey());
             }
         }
     }
@@ -48,16 +53,23 @@ public final class DayOneArrivalManager {
             villager.setCustomNameVisible(true);
             villager.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), EntitySpawnReason.EVENT, null);
             level.addFreshEntity(villager);
+            arrivalGroup.add(villager.getUUID());
         }
         state.history("DAY_ONE_ARRIVAL", "Three settlers arrived near the player on day one.");
         arrived = true;
     }
 
     public boolean follow(ServerLevel level, ServerPlayer player, UUID npcId) {
+        if (!arrivalGroup.contains(npcId)) return false;
         var entity = level.getEntity(npcId);
         if (!(entity instanceof Villager villager) || !villager.isAlive()) return false;
-        followers.put(npcId, player.getUUID());
-        villager.getNavigation().moveTo(player, 1.05D);
+        for (UUID id : arrivalGroup) {
+            var groupEntity = level.getEntity(id);
+            if (groupEntity instanceof Villager v && v.isAlive()) {
+                followers.put(id, player.getUUID());
+                v.getNavigation().moveTo(player, 1.15D);
+            }
+        }
         return true;
     }
 
@@ -68,7 +80,8 @@ public final class DayOneArrivalManager {
     public boolean build(ServerLevel level, WorldMorphState state, ServerPlayer player, UUID npcId) {
         var entity = level.getEntity(npcId);
         if (!(entity instanceof Villager villager) || !villager.isAlive()) return false;
-        followers.remove(npcId);
+        if (!arrivalGroup.contains(npcId)) return false;
+        followers.keySet().removeIf(arrivalGroup::contains);
         var kingdom = state.kingdoms().values().stream()
             .filter(k -> k.leader().equals(player.getUUID()))
             .findFirst().orElseGet(() -> state.createKingdom(player.getName().getString() + "'s Realm", player.getUUID()));
