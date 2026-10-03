@@ -115,12 +115,14 @@ public final class DayOneArrivalManager {
                 if (villager.blockPosition().distSqr(workPos) > 9) {
                     villager.getNavigation().moveTo(workPos.getX()+0.5, workPos.getY(), workPos.getZ()+0.5, 0.9D);
                 } else {
-                    level.setBlock(site, (worker.buildIndex % 5 == 0) ? Blocks.OAK_LOG.defaultBlockState() : Blocks.OAK_PLANKS.defaultBlockState(), 3);
-                    worker.buildIndex++; worker.workCooldown = 6;
+                    net.minecraft.world.level.block.state.BlockState stateToPlace = constructionState(worker.buildIndex);
+                    if (!stateToPlace.isAir()) level.setBlock(site, stateToPlace, 3);
+                    worker.buildIndex += 3;
+                    worker.workCooldown = 6;
                 }
             }
         }
-        if (workers.values().stream().allMatch(w -> w.phase == Phase.BUILD) && workers.values().stream().allMatch(w -> w.buildIndex >= 45)) {
+        if (workers.values().stream().allMatch(w -> w.phase == Phase.BUILD) && workers.values().stream().allMatch(w -> w.buildIndex >= 90)) {
             state.history("DAY_ONE_HOUSES_BUILT", "The first settlers gathered local materials and built their first homes.");
             workers.clear();
             constructionCenter = null;
@@ -136,19 +138,38 @@ public final class DayOneArrivalManager {
     }
 
     private BlockPos constructionBlock(int index) {
-        if (constructionCenter == null || index >= 45) return null;
-        if (index < 25) {
-            int x=index%5, z=index/5;
-            return constructionCenter.offset(x, 0, z);
-        }
-        int wall=index-25;
-        int side=wall/5, along=wall%5;
-        return switch(side) {
-            case 0 -> constructionCenter.offset(along, 1, 0);
-            case 1 -> constructionCenter.offset(4, 1, along);
-            case 2 -> constructionCenter.offset(4-along, 1, 4);
-            default -> constructionCenter.offset(0, 1, 4-along);
+        if (constructionCenter == null || index >= 90) return null;
+        if (index < 25) return constructionCenter.offset(index % 5, 0, index / 5);
+        if (index < 45) return wallPosition(index - 25, 1);
+        if (index < 65) return wallPosition(index - 45, 2);
+        int roof = index - 65;
+        int x = roof % 5, z = roof / 5;
+        int inset = Math.min(Math.min(x, z), Math.min(4 - x, 4 - z));
+        return constructionCenter.offset(x, 3 + inset, z);
+    }
+
+    private BlockPos wallPosition(int index, int y) {
+        int side = index / 5, along = index % 5;
+        return switch (side) {
+            case 0 -> constructionCenter.offset(along, y, 0);
+            case 1 -> constructionCenter.offset(4, y, along);
+            case 2 -> constructionCenter.offset(4 - along, y, 4);
+            default -> constructionCenter.offset(0, y, 4 - along);
         };
+    }
+
+    private net.minecraft.world.level.block.state.BlockState constructionState(int index) {
+        if (index < 25) return Blocks.COBBLESTONE.defaultBlockState();
+        if (index < 65) {
+            int local = index < 45 ? index - 25 : index - 45;
+            int side = local / 5, along = local % 5;
+            boolean corner = along == 0 || along == 4;
+            if (side == 0 && along == 2 && index < 45) return Blocks.AIR.defaultBlockState();
+            if (index >= 45 && ((side == 0 || side == 2) && (along == 1 || along == 3)
+                    || (side == 1 || side == 3) && (along == 1 || along == 3))) return Blocks.GLASS_PANE.defaultBlockState();
+            return corner ? Blocks.OAK_LOG.defaultBlockState() : Blocks.OAK_PLANKS.defaultBlockState();
+        }
+        return Blocks.SPRUCE_STAIRS.defaultBlockState();
     }
 
     public boolean follow(ServerLevel level, ServerPlayer player, UUID npcId) {
@@ -199,6 +220,7 @@ public final class DayOneArrivalManager {
                 profile.addMemory("SETTLEMENT_FOUNDER", null, state.getSimulationTick(), 8);
                 Worker worker = new Worker();
                 worker.phase = workerIndex == 0 ? Phase.GATHER_WOOD : Phase.GATHER_STONE;
+                worker.buildIndex = workerIndex;
                 workers.put(id, worker);
                 workerIndex++;
             }
