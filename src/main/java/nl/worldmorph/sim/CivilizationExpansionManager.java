@@ -48,6 +48,7 @@ public final class CivilizationExpansionManager {
             for (WorldMorphState.SettlementData settlement : List.copyOf(state.settlements().values())) {
                 syncPhysicalCitizens(level, settlement, state, npcs);
                 growKingdom(level, settlement, state, npcs, families, housing, territory, roads);
+                runAdvancedCycle(level, settlement, state, npcs, resources, housing);
                 removeDeadCitizens(level, settlement, npcs);
             }
         }
@@ -267,6 +268,131 @@ public final class CivilizationExpansionManager {
         state.updateSettlement(child.withPopulation(Math.max(2, migrants.size())));
         housing.addHouse(child.id(), 4);
         buildHouse(level, target);
+    }
+
+    // 39-50: lightweight long-term systems keep mature settlements from becoming static.
+    private void runAdvancedCycle(ServerLevel level, WorldMorphState s, WorldMorphState.SettlementData settlement,
+                                  NpcManager npcs, ResourceManager resources, HousingManager housing) {
+        long day = s.getSimulationTick() / DAILY;
+        int season = (int) ((day / 8) % 4);
+        seasonalProduction(settlement, resources, season);
+        treasuryIncome(s, settlement);
+        payWages(settlement, npcs, resources);
+        education(settlement, npcs, s);
+        specialistJobs(settlement, npcs, s);
+        if (day % 7 == 0) holdFestival(settlement, s);
+        if (day % 5 == 0) caravan(settlement, s, resources);
+        if (day % 12 == 0) immigration(settlement, s, npcs, housing);
+        if (day % 20 == 0) migration(settlement, s, npcs);
+        if (day % 30 == 0) monument(level, settlement, s);
+    }
+
+    // 39: seasons change production without changing the core deterministic simulation.
+    private void seasonalProduction(WorldMorphState.SettlementData s, ResourceManager r, int season) {
+        if (season == 0) r.add(s.id(), ResourceManager.Resource.GRAIN, Math.max(1, s.population() / 4));
+        if (season == 1) r.add(s.id(), ResourceManager.Resource.WOOD, Math.max(1, s.population() / 5));
+        if (season == 2) r.add(s.id(), ResourceManager.Resource.FOOD, Math.max(1, s.population() / 4));
+        if (season == 3) r.add(s.id(), ResourceManager.Resource.IRON, Math.max(1, s.population() / 10));
+    }
+
+    // 40: population now contributes predictable tax income.
+    private void treasuryIncome(WorldMorphState state, WorldMorphState.SettlementData s) {
+        state.kingdoms().values().stream().filter(k -> k.id().equals(s.kingdomId())).findFirst()
+                .ifPresent(k -> state.updateKingdom(k.withTreasury(k.treasury() + Math.max(1, s.population() / 10))));
+    }
+
+    // 41: workers receive simulated wages instead of being purely decorative jobs.
+    private void payWages(WorldMorphState.SettlementData s, NpcManager npcs, ResourceManager resources) {
+        long workers = citizens(npcs, s.id()).stream().filter(p -> p.alive() && p.age() >= 16
+                && !"UNEMPLOYED".equals(p.job())).count();
+        long wage = Math.min(resources.get(s.id(), ResourceManager.Resource.GOLD), workers);
+        if (wage > 0) {
+            resources.consume(s.id(), ResourceManager.Resource.GOLD, wage);
+            int paid = 0;
+            for (NpcProfile p : citizens(npcs, s.id())) {
+                if (paid >= wage) break;
+                if (p.alive() && p.age() >= 16 && !"UNEMPLOYED".equals(p.job())) { p.changeMoney(1); paid++; }
+            }
+        }
+    }
+
+    // 42: children get an education memory and a small ambition boost.
+    private void education(WorldMorphState.SettlementData s, NpcManager npcs, WorldMorphState state) {
+        for (NpcProfile p : citizens(npcs, s.id())) {
+            if (p.alive() && p.age() >= 6 && p.age() < 16 && p.memories().stream().noneMatch(m -> "SCHOOL".equals(m.type()))) {
+                p.setAmbition(Math.min(100, p.ambition() + 2));
+                p.addMemory("SCHOOL", null, state.getSimulationTick(), 2);
+            }
+        }
+    }
+
+    // 43: technology and age steer citizens toward useful specialist jobs.
+    private void specialistJobs(WorldMorphState.SettlementData s, NpcManager npcs, WorldMorphState state) {
+        boolean iron = state.kingdoms().containsKey(s.kingdomId()) && s.population() >= 15;
+        for (NpcProfile p : citizens(npcs, s.id())) {
+            if (!p.alive() || p.age() < 18) continue;
+            if (iron && p.ambition() >= 80) p.setJob("BLACKSMITH");
+            else if (p.ambition() <= 15 && p.age() >= 25) p.setJob("MINER");
+        }
+    }
+
+    // 44: festivals improve stability and leave a visible historical record.
+    private void holdFestival(WorldMorphState.SettlementData s, WorldMorphState state) {
+        state.kingdoms().values().stream().filter(k -> k.id().equals(s.kingdomId())).findFirst()
+                .ifPresent(k -> state.updateKingdom(k.withStability(k.stability() + 1)));
+        state.history("LOCAL_FESTIVAL", s.name() + " held a local festival");
+    }
+
+    // 45: caravans move abstract gold between settlements in the same kingdom.
+    private void caravan(WorldMorphState.SettlementData origin, WorldMorphState state, ResourceManager resources) {
+        var destination = state.settlements().values().stream()
+                .filter(x -> !x.id().equals(origin.id()) && x.kingdomId().equals(origin.kingdomId()))
+                .findFirst().orElse(null);
+        if (destination == null) return;
+        long amount = Math.min(3, resources.get(origin.id(), ResourceManager.Resource.GOLD));
+        if (amount > 0) {
+            resources.consume(origin.id(), ResourceManager.Resource.GOLD, amount);
+            resources.add(destination.id(), ResourceManager.Resource.GOLD, amount);
+            state.history("CARAVAN_ARRIVED", origin.name() + " sent a trade caravan to " + destination.name());
+        }
+    }
+
+    // 46: spare housing and food can attract a new resident.
+    private void immigration(WorldMorphState.SettlementData s, WorldMorphState state, NpcManager npcs,
+                             HousingManager housing) {
+        HousingManager.Housing h = housing.get(s.id());
+        if (h.capacity() <= h.residents() || s.population() >= h.capacity()) return;
+        if (npcs.profiles().values().stream().filter(p -> s.id().equals(p.settlementId()) && p.alive()).count() >= s.population()) return;
+        NpcProfile newcomer = npcs.createForSettlement("Settler_" + (npcs.size() + 1), s.id(), s.kingdomId(), state.getSimulationTick());
+        newcomer.setAge(18 + Math.floorMod(newcomer.id().hashCode(), 30));
+        newcomer.setLoyalty(55);
+        housing.moveIn(s.id(), 1);
+        state.updateSettlement(s.withPopulation(s.population() + 1));
+        state.history("IMMIGRANT_ARRIVED", newcomer.name() + " joined " + s.name());
+    }
+
+    // 47: ambitious adults may relocate when a kingdom has multiple settlements.
+    private void migration(WorldMorphState.SettlementData s, WorldMorphState state, NpcManager npcs) {
+        var target = state.settlements().values().stream()
+                .filter(x -> !x.id().equals(s.id()) && x.kingdomId().equals(s.kingdomId()) && x.population() < s.population())
+                .findFirst().orElse(null);
+        if (target == null) return;
+        var migrant = citizens(npcs, s.id()).stream().filter(p -> p.alive() && p.age() >= 18 && p.ambition() >= 70).findFirst().orElse(null);
+        if (migrant == null) return;
+        migrant.setSettlement(target.id());
+        migrant.setFamily(null);
+        state.updateSettlement(s.withPopulation(Math.max(0, s.population() - 1)));
+        state.updateSettlement(target.withPopulation(target.population() + 1));
+        state.history("MIGRATION", migrant.name() + " moved from " + s.name() + " to " + target.name());
+    }
+
+    // 48-50: every mature settlement gets a tiny physical civic monument.
+    private void monument(ServerLevel level, WorldMorphState.SettlementData s, WorldMorphState state) {
+        if (s.population() < 12) return;
+        BlockPos base = s.center().above();
+        for (int y = 0; y < 3; y++) level.setBlock(base.above(y), Blocks.STONE_BRICKS.defaultBlockState(), 3);
+        level.setBlock(base.above(3), Blocks.GOLD_BLOCK.defaultBlockState(), 3);
+        state.history("MONUMENT_RAISED", s.name() + " raised a civic monument");
     }
 
     private void buildHouse(ServerLevel level, BlockPos base) {
