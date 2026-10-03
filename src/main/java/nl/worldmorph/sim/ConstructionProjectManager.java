@@ -14,7 +14,7 @@ import nl.worldmorph.data.WorldMorphState;
  * Projects are serialized through a queue so separate buildings do not overlap in progress.
  */
 public final class ConstructionProjectManager {
-    private enum Kind { HOUSE, BANK, CASTLE, MONUMENT }
+    private enum Kind { HOUSE, BANK, CASTLE, MONUMENT, ROAD, WALL }
     private record Placement(BlockPos pos, BlockState state) {}
     private static final class Project {
         final Kind kind;
@@ -39,6 +39,8 @@ public final class ConstructionProjectManager {
     private final Set<String> queuedCastlePhases = new HashSet<>();
     private final Set<UUID> monumentSettlements = new HashSet<>();
     private final Set<UUID> bankSettlements = new HashSet<>();
+    private final Set<UUID> roadSettlements = new HashSet<>();
+    private final Set<UUID> wallSettlements = new HashSet<>();
     private static final int[] CASTLE_POPULATION = {100, 200, 350, 500, 750};
     private static final int[] CASTLE_COST = {250, 400, 650, 900, 1300};
 
@@ -50,6 +52,48 @@ public final class ConstructionProjectManager {
         pendingHouses.merge(settlement.id(), 1, Integer::sum);
         queue.add(new Project(Kind.HOUSE, settlement.id(), settlement.kingdomId(),
                 settlement.name() + " house", base, 0, housePlan(base, tier)));
+    }
+
+    public void requestRoadsIfReady(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
+        if (settlement.population() < 5 || roadSettlements.contains(settlement.id())) return;
+        boolean existing = state.history().stream().anyMatch(e -> e.type().equals("ROADS_BUILT") && e.description().contains(settlement.id().toString()));
+        if (existing) { roadSettlements.add(settlement.id()); return; }
+        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                settlement.center().getX(), settlement.center().getZ());
+        BlockPos base = new BlockPos(settlement.center().getX(), y, settlement.center().getZ());
+        List<Placement> blocks = new ArrayList<>();
+        for (int d=-14; d<=14; d++) {
+            add(blocks, ground(level, base.getX()+d, base.getZ()), state(Blocks.GRAVEL));
+            add(blocks, ground(level, base.getX(), base.getZ()+d), state(Blocks.GRAVEL));
+        }
+        queue.add(new Project(Kind.ROAD, settlement.id(), settlement.kingdomId(), settlement.name()+" roads", base, 0, blocks));
+        roadSettlements.add(settlement.id());
+        state.history("ROAD_ORDERED", "Citizens of " + settlement.name() + " started building local roads.");
+    }
+
+    public void requestWallIfReady(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
+        if (settlement.population() < 50 || wallSettlements.contains(settlement.id())) return;
+        boolean existing = state.history().stream().anyMatch(e -> e.type().equals("WALL_BUILT") && e.description().contains(settlement.id().toString()));
+        if (existing) { wallSettlements.add(settlement.id()); return; }
+        int radius = 20;
+        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                settlement.center().getX(), settlement.center().getZ());
+        BlockPos base = new BlockPos(settlement.center().getX(), y, settlement.center().getZ());
+        List<Placement> blocks = new ArrayList<>();
+        for (int x=-radius;x<=radius;x++) for(int z=-radius;z<=radius;z++) {
+            if(Math.abs(x)!=radius && Math.abs(z)!=radius) continue;
+            boolean gate = z==-radius && x>=-2 && x<=2;
+            for(int h=0;h<4;h++) if(!gate || h>=3) add(blocks, base.offset(x,h,z), state(Blocks.COBBLESTONE));
+            if((x+z)%4==0) add(blocks, base.offset(x,4,z), state(Blocks.STONE_BRICK_WALL));
+        }
+        queue.add(new Project(Kind.WALL, settlement.id(), settlement.kingdomId(), settlement.name()+" walls", base, 0, blocks));
+        wallSettlements.add(settlement.id());
+        state.history("WALL_ORDERED", "Citizens of " + settlement.name() + " started building defensive walls.");
+    }
+
+    private BlockPos ground(ServerLevel level, int x, int z) {
+        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        return new BlockPos(x, y, z);
     }
 
     public void requestBankIfReady(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
@@ -157,6 +201,10 @@ public final class ConstructionProjectManager {
             } else if (project.kind == Kind.BANK) {
                 bankSettlements.add(project.settlementId);
                 state.history("BANK_BUILT", "Settlement " + project.settlementId + ": " + project.name + " was completed block by block by citizens.");
+            } else if (project.kind == Kind.WALL) {
+                state.history("WALL_BUILT", "Settlement " + project.settlementId + ": " + project.name + " was completed block by block by citizens.");
+            } else if (project.kind == Kind.ROAD) {
+                state.history("ROADS_BUILT", "Settlement " + project.settlementId + ": " + project.name + " were completed block by block by citizens.");
             } else if (project.kind == Kind.CASTLE) {
                 completedCastlePhases.put(project.kingdomId, project.castlePhase);
                 queuedCastlePhases.remove(project.kingdomId + ":" + project.castlePhase);
