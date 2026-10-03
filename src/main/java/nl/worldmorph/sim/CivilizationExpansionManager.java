@@ -51,7 +51,7 @@ public final class CivilizationExpansionManager {
                 constructionProjects.requestBankIfReady(level, state, settlement);
                 constructionProjects.requestRoadsIfReady(level, state, settlement);
                 constructionProjects.requestWallIfReady(level, state, settlement);
-                maintainRoads(settlement, state, roads);
+                constructionProjects.requestVillageBuildingsIfReady(level, state, settlement);
                 enforcePopulationCap(settlement, state);
             }
         }
@@ -306,7 +306,6 @@ public final class CivilizationExpansionManager {
         if (day % 12 == 0) immigration(settlement, s, npcs, housing);
         if (day % 20 == 0) migration(settlement, s, npcs);
         if (day % 30 == 0) monument(level, settlement, s);
-        constructionProjects.requestCastleIfReady(level, s, settlement);
     }
 
     // 39: seasons change production without changing the core deterministic simulation.
