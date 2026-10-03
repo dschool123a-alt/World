@@ -23,6 +23,7 @@ public final class ArmyManager {
 
     public boolean recruit(WorldMorphState state, UUID kingdomId, NpcProfile npc) {
         if (!state.kingdoms().containsKey(kingdomId) || !npc.alive()) return false;
+        if (!state.spendTreasury(kingdomId, 20, "army recruitment")) return false;
         LinkedHashSet<UUID> soldiers = soldiersByKingdom.computeIfAbsent(kingdomId, ignored -> new LinkedHashSet<>());
         if (!soldiers.add(npc.id())) return false;
         npc.setKingdom(kingdomId);
