@@ -194,6 +194,15 @@ public final class ConstructionProjectManager {
                 v -> v.isAlive() && !v.isBaby() && isCitizenBuilder(v, project, npcs)).stream().limit(3).toList();
         if (builders.isEmpty()) return;
 
+        // Construction is performed by actual citizens assigned to the BUILDER job.
+        // Give builders a small amount of visible work state so other systems can react to it.
+        for (Villager villager : builders) {
+            NpcProfile profile = npcs.get(villager.getUUID());
+            if (profile != null && profile.memories().stream().noneMatch(m -> "BUILDING".equals(m.type()))) {
+                profile.addMemory("BUILDING", null, state.getSimulationTick(), 2);
+            }
+        }
+
         BlockPos staging = project.kind == Kind.HOUSE || project.kind == Kind.BANK
                 ? project.base.offset(-2, 0, 3)
                 : project.base.offset(-2, 0, 12);
@@ -222,6 +231,10 @@ public final class ConstructionProjectManager {
         project.cooldown = 5;
         if (project.index >= project.blocks.size()) {
             queue.remove();
+            for (Villager villager : builders) {
+                NpcProfile profile = npcs.get(villager.getUUID());
+                if (profile != null) profile.addMemory("FINISHED_BUILDING", null, state.getSimulationTick(), 3);
+            }
             if (project.kind == Kind.HOUSE) {
                 pendingHouses.compute(project.settlementId, (id, n) -> Math.max(0, (n == null ? 1 : n) - 1));
                 housing.addHouse(project.settlementId, 4);
@@ -253,7 +266,7 @@ public final class ConstructionProjectManager {
         NpcProfile profile = npcs.get(villager.getUUID());
         return profile != null && profile.alive()
                 && project.settlementId.equals(profile.settlementId())
-                && ("BUILDER".equals(profile.job()) || project.kind != Kind.CASTLE);
+                && "BUILDER".equals(profile.job());
     }
 
     private int historyCastlePhase(WorldMorphState state, UUID kingdomId) {
