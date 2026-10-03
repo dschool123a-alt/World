@@ -13,7 +13,7 @@ public final class WorldMorphClient implements ClientModInitializer {
             if (entity.hasCustomName() && entity.getCustomName() != null) {
                 String name = entity.getCustomName().getString();
                 if (name.equals("Settler") || name.equals("Builder") || name.equals("Farmer")) {
-                    Minecraft.getInstance().setScreen(new SettlerDialogueScreen(entity.getUUID(), name));
+                    Minecraft.getInstance().setScreenAndShow(new SettlerDialogueScreen(entity.getUUID(), name));
                     return InteractionResult.SUCCESS;
                 }
             }
