@@ -51,8 +51,10 @@ public final class ConstructionProjectManager {
                 settlement.name() + " house", base, 0, housePlan(base, tier)));
     }
 
-    public void requestMonument(ServerLevel level, WorldMorphState.SettlementData settlement) {
-        if (settlement.population() < 12 || monumentSettlements.contains(settlement.id())) return;
+    public void requestMonument(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
+        if (settlement.population() < 12 || monumentSettlements.contains(settlement.id())
+                || state.history().stream().anyMatch(e -> e.type().equals("MONUMENT_RAISED")
+                && e.description().contains(settlement.id().toString()))) return;
         boolean queued = queue.stream().anyMatch(p -> p.kind == Kind.MONUMENT && p.settlementId.equals(settlement.id()));
         if (queued) return;
         int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
@@ -144,7 +146,7 @@ public final class ConstructionProjectManager {
                         "Kingdom " + project.kingdomId + ": " + project.name + " completed castle phase " + project.castlePhase + ".");
             } else {
                 monumentSettlements.add(project.settlementId);
-                state.history("MONUMENT_RAISED", project.name + " was built block by block by villagers.");
+                state.history("MONUMENT_RAISED", "Settlement " + project.settlementId + ": " + project.name + " was built block by block by villagers.");
             }
         }
     }
