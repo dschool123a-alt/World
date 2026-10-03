@@ -112,7 +112,7 @@ public final class DayOneArrivalManager {
                     worker.phase = Phase.BUILD;
                     continue;
                 }
-                BlockPos workPos = site.below();
+                BlockPos workPos = new BlockPos(site.getX(), constructionCenter.getY() + 1, site.getZ());
                 if (villager.blockPosition().distSqr(workPos) > 9) {
                     villager.getNavigation().moveTo(workPos.getX()+0.5, workPos.getY(), workPos.getZ()+0.5, 0.9D);
                 } else {
@@ -221,7 +221,9 @@ public final class DayOneArrivalManager {
         var settlement = state.createSettlement("New Settlement", center, kingdom.id());
         state.updateSettlement(settlement.withPopulation(3));
         settlementId = settlement.id();
-        constructionCenter = center.offset(8, 0, 8);
+        BlockPos buildXZ = center.offset(8, 0, 8);
+        int surfaceY = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, buildXZ.getX(), buildXZ.getZ());
+        constructionCenter = new BlockPos(buildXZ.getX(), surfaceY, buildXZ.getZ());
         wood = 0;
         stone = 0;
         int workerIndex = 0;
