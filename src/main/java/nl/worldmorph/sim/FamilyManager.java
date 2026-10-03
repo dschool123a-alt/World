@@ -13,6 +13,7 @@ public final class FamilyManager {
   UUID head=members.contains(preferredHead)?preferredHead:a.head();
   Family merged=new Family(a.id(),head,members,a.homeSettlement());
   families.put(a.id(),merged); families.remove(b.id());
+  for(UUID member:members) if(member.equals(a.head())||member.equals(b.head())) { /* profiles are relinked by callers */ }
   return true;
  }
  public Optional<Family> get(UUID id){return Optional.ofNullable(families.get(id));} public Collection<Family> all(){return List.copyOf(families.values());}
