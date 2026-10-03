@@ -29,11 +29,12 @@ public final class RoyalAdministrationManager {
                              BlockPos target, BlockPos returnPos, long arriveTick,
                              String type, String reason) {}
 
-    public void tick(ServerLevel level, WorldMorphState state, NpcManager npcs, RoadNetwork roads) {
+    public void tick(ServerLevel level, WorldMorphState state, NpcManager npcs, RoadNetwork roads, CivilizationExpansionManager expansion) {
         long tick = state.getSimulationTick();
         for (WorldMorphState.KingdomData kingdom : List.copyOf(state.kingdoms().values())) {
             if (population(state, kingdom.id()) < UNLOCK_POPULATION) continue;
             ensureAssistant(level, state, npcs, kingdom);
+            assistantOrdersConstruction(level, state, kingdom, expansion.constructionProjects());
             followLeader(level, kingdom);
         }
         for (Messenger m : List.copyOf(messengers.values())) {
@@ -123,6 +124,15 @@ public final class RoyalAdministrationManager {
             assistants.put(kingdom.id(), id);
             state.history("ROYAL_ASSISTANT", kingdom.name() + " appointed a Royal Assistant after reaching 100 citizens.");
         }
+    }
+
+    private void assistantOrdersConstruction(ServerLevel level, WorldMorphState state,
+                                              WorldMorphState.KingdomData kingdom,
+                                              ConstructionProjectManager construction) {
+        if (population(state, kingdom.id()) < UNLOCK_POPULATION) return;
+        WorldMorphState.SettlementData capital = capital(state, kingdom.id());
+        if (capital == null) return;
+        construction.requestCastleIfReady(level, state, capital);
     }
 
     private void followLeader(ServerLevel level, WorldMorphState.KingdomData kingdom) {
