@@ -14,7 +14,7 @@ import nl.worldmorph.data.WorldMorphState;
  * Projects are serialized through a queue so separate buildings do not overlap in progress.
  */
 public final class ConstructionProjectManager {
-    private enum Kind { HOUSE, CASTLE, MONUMENT }
+    private enum Kind { HOUSE, BANK, CASTLE, MONUMENT }
     private record Placement(BlockPos pos, BlockState state) {}
     private static final class Project {
         final Kind kind;
@@ -38,6 +38,7 @@ public final class ConstructionProjectManager {
     private final Map<UUID, Integer> completedCastlePhases = new HashMap<>();
     private final Set<String> queuedCastlePhases = new HashSet<>();
     private final Set<UUID> monumentSettlements = new HashSet<>();
+    private final Set<UUID> bankSettlements = new HashSet<>();
     private static final int[] CASTLE_POPULATION = {100, 200, 350, 500, 750};
     private static final int[] CASTLE_COST = {250, 400, 650, 900, 1300};
 
@@ -49,6 +50,20 @@ public final class ConstructionProjectManager {
         pendingHouses.merge(settlement.id(), 1, Integer::sum);
         queue.add(new Project(Kind.HOUSE, settlement.id(), settlement.kingdomId(),
                 settlement.name() + " house", base, 0, housePlan(base, tier)));
+    }
+
+    public void requestBankIfReady(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
+        if (settlement.population() < 100 || bankSettlements.contains(settlement.id())) return;
+        boolean existing = state.history().stream().anyMatch(e ->
+                e.type().equals("BANK_BUILT") && e.description().contains(settlement.id().toString()));
+        boolean queued = queue.stream().anyMatch(p -> p.kind == Kind.BANK && p.settlementId.equals(settlement.id()));
+        if (existing || queued) { bankSettlements.add(settlement.id()); return; }
+        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                settlement.center().getX() + 8, settlement.center().getZ());
+        BlockPos base = new BlockPos(settlement.center().getX() + 8, y, settlement.center().getZ());
+        queue.add(new Project(Kind.BANK, settlement.id(), settlement.kingdomId(),
+                settlement.name() + " bank", base, 0, bankPlan(base)));
+        state.history("BANK_ORDERED", "Settlement " + settlement.id() + " ordered citizens to build a bank for tax administration.");
     }
 
     public void requestMonument(ServerLevel level, WorldMorphState state, WorldMorphState.SettlementData settlement) {
@@ -107,7 +122,7 @@ public final class ConstructionProjectManager {
                 v -> v.isAlive() && !v.isBaby()).stream().limit(3).toList();
         if (builders.isEmpty()) return;
 
-        BlockPos staging = project.kind == Kind.HOUSE
+        BlockPos staging = project.kind == Kind.HOUSE || project.kind == Kind.BANK
                 ? project.base.offset(-2, 0, 3)
                 : project.base.offset(-2, 0, 12);
         int sy = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
@@ -139,6 +154,9 @@ public final class ConstructionProjectManager {
                 pendingHouses.compute(project.settlementId, (id, n) -> Math.max(0, (n == null ? 1 : n) - 1));
                 housing.addHouse(project.settlementId, 4);
                 state.history("HOUSE_BUILT", project.name + " was completed block by block by villagers.");
+            } else if (project.kind == Kind.BANK) {
+                bankSettlements.add(project.settlementId);
+                state.history("BANK_BUILT", "Settlement " + project.settlementId + ": " + project.name + " was completed block by block by citizens.");
             } else if (project.kind == Kind.CASTLE) {
                 completedCastlePhases.put(project.kingdomId, project.castlePhase);
                 queuedCastlePhases.remove(project.kingdomId + ":" + project.castlePhase);
@@ -160,6 +178,29 @@ public final class ConstructionProjectManager {
             }
         }
         return max;
+    }
+
+    private List<Placement> bankPlan(BlockPos b) {
+        List<Placement> out = new ArrayList<>();
+        BlockState foundation = state(Blocks.STONE_BRICKS);
+        BlockState wall = state(Blocks.POLISHED_ANDESITE);
+        BlockState roof = state(Blocks.DARK_OAK_PLANKS);
+        for (int x=0;x<9;x++) for(int z=0;z<7;z++) add(out,b.offset(x,0,z),foundation);
+        for (int y=1;y<=4;y++) for(int x=0;x<9;x++) for(int z=0;z<7;z++) {
+            boolean edge=x==0||x==8||z==0||z==6;
+            if(!edge) continue;
+            boolean door=z==0&&x>=3&&x<=5&&y<=2;
+            boolean window=y==2&&((z==0||z==6)&&(x==1||x==7));
+            add(out,b.offset(x,y,z),door?state(Blocks.AIR):window?state(Blocks.GLASS_PANE):wall);
+        }
+        for(int x=-1;x<=9;x++) for(int z=-1;z<=7;z++) {
+            if(x==-1||x==9||z==-1||z==7) add(out,b.offset(x,5,z),roof);
+        }
+        add(out,b.offset(4,1,3),state(Blocks.CHEST));
+        add(out,b.offset(3,1,3),state(Blocks.LECTERN));
+        add(out,b.offset(5,1,3),state(Blocks.BARREL));
+        add(out,b.offset(4,2,0),state(Blocks.LANTERN));
+        return out;
     }
 
     private List<Placement> housePlan(BlockPos b, int tier) {
