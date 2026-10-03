@@ -49,6 +49,8 @@ public final class CivilizationExpansionManager {
                 claimTerritory(settlement, state, territory);
                 buildNeededHomes(level, settlement, npcs, housing, state);
                 constructionProjects.requestBankIfReady(level, state, settlement);
+                constructionProjects.requestRoadsIfReady(level, state, settlement);
+                constructionProjects.requestWallIfReady(level, state, settlement);
                 maintainRoads(settlement, state, roads);
                 enforcePopulationCap(settlement, state);
             }
