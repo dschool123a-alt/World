@@ -133,13 +133,29 @@ public final class RoyalAdministrationManager {
         WorldMorphState.SettlementData capital = capital(state, kingdom.id());
         if (capital == null) return;
         int population = population(state, kingdom.id());
-        int phase = population >= 750 ? 5 : population >= 500 ? 4 : population >= 350 ? 3 : population >= 200 ? 2 : 1;
+        int completed = 0;
+        for (WorldMorphState.HistoryEvent event : state.history()) {
+            if (!event.type().startsWith("CASTLE_PHASE_") || !event.description().contains(kingdom.id().toString())) continue;
+            try {
+                completed = Math.max(completed, Integer.parseInt(event.type().substring("CASTLE_PHASE_".length())));
+            } catch (NumberFormatException ignored) { }
+        }
+        int nextPhase = completed + 1;
+        int required = switch (nextPhase) {
+            case 1 -> 100;
+            case 2 -> 200;
+            case 3 -> 350;
+            case 4 -> 500;
+            case 5 -> 750;
+            default -> Integer.MAX_VALUE;
+        };
+        if (population < required || nextPhase > 5) return;
         boolean alreadyOrdered = state.history().stream().anyMatch(e ->
                 e.type().equals("ROYAL_BUILD_ORDER")
                         && e.description().contains(kingdom.id().toString())
-                        && e.description().contains("phase " + phase));
+                        && e.description().contains("phase " + nextPhase));
         if (!alreadyOrdered) {
-            state.history("ROYAL_BUILD_ORDER", kingdom.name() + " Royal Assistant ordered castle phase " + phase + " construction.");
+            state.history("ROYAL_BUILD_ORDER", kingdom.name() + " Royal Assistant ordered castle phase " + nextPhase + " construction.");
         }
         construction.requestCastleIfReady(level, state, capital);
     }
