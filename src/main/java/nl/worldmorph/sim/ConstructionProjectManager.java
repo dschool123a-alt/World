@@ -224,6 +224,9 @@ public final class ConstructionProjectManager {
                 new net.minecraft.world.phys.AABB(project.base).inflate(48),
                 v -> v.isAlive() && !v.isBaby() && isCitizenBuilder(v, project, state, npcs)).stream().limit(3).toList();
         if (builders.isEmpty()) return;
+        List<Villager> miners = level.getEntitiesOfClass(Villager.class,
+                new net.minecraft.world.phys.AABB(project.base).inflate(64),
+                v -> v.isAlive() && !v.isBaby() && isSettlementWorker(v, project, npcs, "MINER")).stream().limit(3).toList();
 
         // Construction is performed by actual citizens assigned to the BUILDER job.
         // Give builders a small amount of visible work state so other systems can react to it.
@@ -256,8 +259,16 @@ public final class ConstructionProjectManager {
             Placement placement = project.blocks.get(project.index);
             if (placement.state().isAir()) { project.index++; continue; }
             String material = materialKey(placement.state());
+            if (material == null) { project.index++; continue; }
             if (!hasMaterial(project.settlementId, material)) {
-                mineForConstruction(level, project, builders);
+                List<Villager> gatherers = miners.isEmpty() ? builders : miners;
+                for (Villager villager : gatherers) {
+                    NpcProfile profile = npcs.get(villager.getUUID());
+                    if (profile != null && profile.memories().stream().noneMatch(m -> "MINING_FOR_CONSTRUCTION".equals(m.type()))) {
+                        profile.addMemory("MINING_FOR_CONSTRUCTION", null, state.getSimulationTick(), 2);
+                    }
+                }
+                mineForConstruction(level, project, gatherers);
                 project.cooldown = 10;
                 return;
             }
@@ -313,8 +324,16 @@ public final class ConstructionProjectManager {
         return projectPopulation(state, project.settlementId) < 50 || "BUILDER".equals(profile.job());
     }
 
+    private boolean isSettlementWorker(Villager villager, Project project, NpcManager npcs, String job) {
+        NpcProfile profile = npcs.get(villager.getUUID());
+        return profile != null && profile.alive()
+                && project.settlementId.equals(profile.settlementId())
+                && job.equals(profile.job());
+    }
+
     private boolean hasMaterial(UUID settlementId, String material) {
-        return material == null || minedMaterials.getOrDefault(settlementId, Map.of()).getOrDefault(material, 0) > 0;
+        return material != null
+                && minedMaterials.getOrDefault(settlementId, Map.of()).getOrDefault(material, 0) > 0;
     }
 
     private void consumeMaterial(UUID settlementId, String material) {
@@ -371,7 +390,7 @@ public final class ConstructionProjectManager {
             if(x!=0&&x!=w-1&&z!=0&&z!=d-1) continue;
             boolean door=z==0&&x==w/2&&y<=2;
             boolean window=y==2&&((z==0||z==d-1)&&(x==1||x==w-2));
-            add(out,b.offset(x,y,z),door?state(Blocks.AIR):window?state(Blocks.GLASS_PANE):wall);
+            add(out,b.offset(x,y,z),door?state(Blocks.AIR):window?state(Blocks.OAK_FENCE):wall);
         }
         for(int x=-1;x<=w;x++) for(int z=-1;z<=d;z++)
             if(x==-1||x==w||z==-1||z==d) add(out,b.offset(x,h+1,z),roof);
@@ -379,14 +398,17 @@ public final class ConstructionProjectManager {
     }
     private List<Placement> marketPlan(BlockPos b) {
         List<Placement> o=new ArrayList<>();
-        for(int x=-1;x<=1;x++) for(int z=-1;z<=1;z++) add(o,b.offset(x*4,0,z*4),state(Blocks.SPRUCE_PLANKS));
-        for(int x=-1;x<=1;x++) for(int z=-1;z<=1;z++) { add(o,b.offset(x*4,1,z*4),state(Blocks.OAK_FENCE)); add(o,b.offset(x*4,2,z*4),state(Blocks.OAK_PLANKS)); }
+        for(int x=-1;x<=1;x++) for(int z=-1;z<=1;z++) {
+            add(o,b.offset(x*4,0,z*4),state(Blocks.SPRUCE_PLANKS));
+            add(o,b.offset(x*4,1,z*4),state(Blocks.OAK_FENCE));
+            add(o,b.offset(x*4,2,z*4),state(Blocks.OAK_PLANKS));
+        }
         return o;
     }
     private List<Placement> blacksmithPlan(BlockPos b){ return boxPlan(b,state(Blocks.COBBLESTONE),state(Blocks.STONE_BRICKS),state(Blocks.SPRUCE_PLANKS),7,7,3); }
-    private List<Placement> libraryPlan(BlockPos b){ List<Placement> o=boxPlan(b,state(Blocks.OAK_PLANKS),state(Blocks.SPRUCE_PLANKS),state(Blocks.DARK_OAK_PLANKS),9,7,4); add(o,b.offset(4,1,3),state(Blocks.BOOKSHELF)); add(o,b.offset(3,1,3),state(Blocks.LECTERN)); return o; }
-    private List<Placement> townHallPlan(BlockPos b){ List<Placement> o=boxPlan(b,state(Blocks.STONE_BRICKS),state(Blocks.OAK_LOG),state(Blocks.SPRUCE_PLANKS),11,9,4); add(o,b.offset(5,1,4),state(Blocks.BELL)); add(o,b.offset(5,5,4),state(Blocks.LANTERN)); return o; }
-    private List<Placement> farmPlan(BlockPos b){ List<Placement> o=new ArrayList<>(); for(int x=0;x<15;x++) for(int z=0;z<9;z++) { if(x==7) add(o,b.offset(x,0,z),state(Blocks.WATER)); else add(o,b.offset(x,0,z),state(Blocks.FARMLAND)); } for(int x=0;x<15;x+=2) add(o,b.offset(x,1,0),state(Blocks.OAK_FENCE)); add(o,b.offset(7,1,4),state(Blocks.WATER)); return o; }
+    private List<Placement> libraryPlan(BlockPos b){ return boxPlan(b,state(Blocks.OAK_PLANKS),state(Blocks.SPRUCE_PLANKS),state(Blocks.DARK_OAK_PLANKS),9,7,4); }
+    private List<Placement> townHallPlan(BlockPos b){ return boxPlan(b,state(Blocks.STONE_BRICKS),state(Blocks.OAK_LOG),state(Blocks.SPRUCE_PLANKS),11,9,4); }
+    private List<Placement> farmPlan(BlockPos b){ List<Placement> o=new ArrayList<>(); for(int x=0;x<15;x++) for(int z=0;z<9;z++) add(o,b.offset(x,0,z),state(Blocks.DIRT)); for(int x=0;x<15;x+=2) add(o,b.offset(x,1,0),state(Blocks.OAK_FENCE)); return o; }
 
     private List<Placement> bankPlan(BlockPos b) {
         List<Placement> out = new ArrayList<>();
@@ -404,10 +426,6 @@ public final class ConstructionProjectManager {
         for(int x=-1;x<=9;x++) for(int z=-1;z<=7;z++) {
             if(x==-1||x==9||z==-1||z==7) add(out,b.offset(x,5,z),roof);
         }
-        add(out,b.offset(4,1,3),state(Blocks.CHEST));
-        add(out,b.offset(3,1,3),state(Blocks.LECTERN));
-        add(out,b.offset(5,1,3),state(Blocks.BARREL));
-        add(out,b.offset(4,2,0),state(Blocks.LANTERN));
         return out;
     }
 
@@ -424,7 +442,7 @@ public final class ConstructionProjectManager {
             if (z==0 && x==3 && y<=2) continue;
             boolean corner=(x==0||x==6)&&(z==0||z==6);
             boolean window=y==2 && (((z==0||z==6)&&(x==2||x==4))||((x==0||x==6)&&(z==2||z==4)));
-            add(out,b.offset(x,y,z),corner?log:window?state(Blocks.GLASS_PANE):wall);
+            add(out,b.offset(x,y,z),corner?log:window?state(Blocks.OAK_FENCE):wall);
         }
         for(int layer=0;layer<3;layer++) {
             int min=layer,max=6-layer,y=4+layer;
