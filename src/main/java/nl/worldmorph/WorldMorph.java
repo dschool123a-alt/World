@@ -76,30 +76,32 @@ public final class WorldMorph implements ModInitializer {
  private static LiteralArgumentBuilder<CommandSourceStack> tradeRouteCommands(){
   var root=Commands.literal("trade");
   var route=Commands.literal("route");
-  route.then(Commands.literal("create")
-   .then(Commands.argument("origin",StringArgumentType.word())
-    .then(Commands.argument("destination",StringArgumentType.word())
-     .then(Commands.argument("good",StringArgumentType.word())
-      .then(Commands.argument("quantity",IntegerArgumentType.integer(1,100000))
-       .then(Commands.argument("interval",IntegerArgumentType.integer(20,10000000)).executes(c->{
-        var state=WorldMorphStateAccess.get(c.getSource().getLevel());
-        String originName=StringArgumentType.getString(c,"origin");
-        String destinationName=StringArgumentType.getString(c,"destination");
-        var origin=findSettlement(state,originName);
-        var destination=findSettlement(state,destinationName);
-        if(origin==null||destination==null){
-         c.getSource().sendFailure(Component.literal("Settlement not found. Use the settlement name without spaces, e.g. NewVillage."));
-         return 0;
-        }
-        var created=SIMULATION.tradeRoutes().create(origin.id(),destination.id(),
-         StringArgumentType.getString(c,"good"),IntegerArgumentType.getInteger(c,"quantity"),IntegerArgumentType.getInteger(c,"interval"));
-        if(created==null){
-         c.getSource().sendFailure(Component.literal("Route rejected. Goods: WOOD, STONE, IRON, GRAIN, FOOD, TOOLS, GOLD. Quantity must be positive and interval at least 20 ticks."));
-         return 0;
-        }
-        c.getSource().sendSuccess(()->Component.literal("Trade route created: "+created.quantity()+" "+created.good()+" from "+origin.name()+" to "+destination.name()+", every "+created.intervalTicks()+" ticks. Goods travel using the road network and must exist in the origin stockpile."),true);
-        return 1;
-       })))))));
+
+  var intervalArg=Commands.argument("interval",IntegerArgumentType.integer(20,10000000)).executes(c->{
+   var state=WorldMorphStateAccess.get(c.getSource().getLevel());
+   String originName=StringArgumentType.getString(c,"origin");
+   String destinationName=StringArgumentType.getString(c,"destination");
+   var origin=findSettlement(state,originName);
+   var destination=findSettlement(state,destinationName);
+   if(origin==null||destination==null){
+    c.getSource().sendFailure(Component.literal("Settlement not found. Use the settlement name without spaces, e.g. NewVillage."));
+    return 0;
+   }
+   var created=SIMULATION.tradeRoutes().create(origin.id(),destination.id(),
+    StringArgumentType.getString(c,"good"),IntegerArgumentType.getInteger(c,"quantity"),IntegerArgumentType.getInteger(c,"interval"));
+   if(created==null){
+    c.getSource().sendFailure(Component.literal("Route rejected. Goods: WOOD, STONE, IRON, GRAIN, FOOD, TOOLS, GOLD. Quantity must be positive and interval at least 20 ticks."));
+    return 0;
+   }
+   c.getSource().sendSuccess(()->Component.literal("Trade route created: "+created.quantity()+" "+created.good()+" from "+origin.name()+" to "+destination.name()+", every "+created.intervalTicks()+" ticks. Goods travel using the road network and must exist in the origin stockpile."),true);
+   return 1;
+  });
+  var quantityArg=Commands.argument("quantity",IntegerArgumentType.integer(1,100000)).then(intervalArg);
+  var goodArg=Commands.argument("good",StringArgumentType.word()).then(quantityArg);
+  var destinationArg=Commands.argument("destination",StringArgumentType.word()).then(goodArg);
+  var originArg=Commands.argument("origin",StringArgumentType.word()).then(destinationArg);
+  route.then(Commands.literal("create").then(originArg));
+
   route.then(Commands.literal("list").executes(c->{
    var state=WorldMorphStateAccess.get(c.getSource().getLevel());
    var routes=SIMULATION.tradeRoutes().all();
@@ -118,6 +120,7 @@ public final class WorldMorph implements ModInitializer {
    c.getSource().sendSuccess(()->Component.literal("Shipments in transit: "+SIMULATION.tradeRoutes().inTransit()),false);
    return routes.size();
   }));
+
   route.then(Commands.literal("pause").then(Commands.argument("id",StringArgumentType.word()).executes(c->{
    try{
     var id=java.util.UUID.fromString(StringArgumentType.getString(c,"id"));
@@ -126,6 +129,7 @@ public final class WorldMorph implements ModInitializer {
     c.getSource().sendSuccess(()->Component.literal("Trade route paused."),false);return 1;
    }catch(IllegalArgumentException ex){c.getSource().sendFailure(Component.literal("Invalid route ID."));return 0;}
   })));
+
   route.then(Commands.literal("resume").then(Commands.argument("id",StringArgumentType.word()).executes(c->{
    try{
     var id=java.util.UUID.fromString(StringArgumentType.getString(c,"id"));
@@ -134,6 +138,7 @@ public final class WorldMorph implements ModInitializer {
     c.getSource().sendSuccess(()->Component.literal("Trade route resumed."),false);return 1;
    }catch(IllegalArgumentException ex){c.getSource().sendFailure(Component.literal("Invalid route ID."));return 0;}
   })));
+
   root.then(route);
   return root;
  }
