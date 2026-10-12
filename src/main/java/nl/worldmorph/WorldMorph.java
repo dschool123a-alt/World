@@ -18,6 +18,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import nl.worldmorph.data.WorldMorphStateAccess;
+import nl.worldmorph.data.WorldMorphState;
 import nl.worldmorph.npc.NpcProfile;
 import nl.worldmorph.sim.*;
 import org.slf4j.Logger;
@@ -67,11 +68,83 @@ public final class WorldMorph implements ModInitializer {
     }))));
 
   root.then(Commands.literal("debug").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)).executes(c->{var s=WorldMorphStateAccess.get(c.getSource().getLevel());c.getSource().sendSuccess(()->Component.literal("tick="+s.getSimulationTick()+" | kingdoms="+s.kingdoms().size()+" | settlements="+s.settlements().size()+" | NPCs="+SIMULATION.npcs().size()+" | history="+s.history().size()),false);return 1;}));
-  root.then(kingdomCommands()); root.then(orderCommands()); root.then(settlementCommands()); root.then(npcCommands()); root.then(statusCommands()); root.then(eventCommands()); root.then(armyCommands());
+  root.then(kingdomCommands()); root.then(orderCommands()); root.then(tradeRouteCommands()); root.then(settlementCommands()); root.then(npcCommands()); root.then(statusCommands()); root.then(eventCommands()); root.then(armyCommands());
   root.then(jobCommands()); root.then(lawCommands()); root.then(taxCommands()); root.then(familyCommands()); root.then(homeCommands());
   root.then(historyCommands()); root.then(economyCommands()); root.then(reputationCommands()); root.then(technologyCommands()); root.then(warCommands()); root.then(cannonCommands());
   d.register(root);
  }
+ private static LiteralArgumentBuilder<CommandSourceStack> tradeRouteCommands(){
+  var root=Commands.literal("trade");
+  var route=Commands.literal("route");
+  route.then(Commands.literal("create")
+   .then(Commands.argument("origin",StringArgumentType.word())
+    .then(Commands.argument("destination",StringArgumentType.word())
+     .then(Commands.argument("good",StringArgumentType.word())
+      .then(Commands.argument("quantity",IntegerArgumentType.integer(1,100000))
+       .then(Commands.argument("interval",IntegerArgumentType.integer(20,10000000)).executes(c->{
+        var state=WorldMorphStateAccess.get(c.getSource().getLevel());
+        String originName=StringArgumentType.getString(c,"origin");
+        String destinationName=StringArgumentType.getString(c,"destination");
+        var origin=findSettlement(state,originName);
+        var destination=findSettlement(state,destinationName);
+        if(origin==null||destination==null){
+         c.getSource().sendFailure(Component.literal("Settlement not found. Use the settlement name without spaces, e.g. NewVillage."));
+         return 0;
+        }
+        var created=SIMULATION.tradeRoutes().create(origin.id(),destination.id(),
+         StringArgumentType.getString(c,"good"),IntegerArgumentType.getInteger(c,"quantity"),IntegerArgumentType.getInteger(c,"interval"));
+        if(created==null){
+         c.getSource().sendFailure(Component.literal("Route rejected. Goods: WOOD, STONE, IRON, GRAIN, FOOD, TOOLS, GOLD. Quantity must be positive and interval at least 20 ticks."));
+         return 0;
+        }
+        c.getSource().sendSuccess(()->Component.literal("Trade route created: "+created.quantity()+" "+created.good()+" from "+origin.name()+" to "+destination.name()+", every "+created.intervalTicks()+" ticks. Goods travel using the road network and must exist in the origin stockpile."),true);
+        return 1;
+       }))))));
+  route.then(Commands.literal("list").executes(c->{
+   var state=WorldMorphStateAccess.get(c.getSource().getLevel());
+   var routes=SIMULATION.tradeRoutes().all();
+   if(routes.isEmpty()){
+    c.getSource().sendSuccess(()->Component.literal("No trade routes. Create one with /worldmorph trade route create <origin> <destination> <good> <quantity> <interval>."),false);
+    return 1;
+   }
+   for(var item:routes){
+    var origin=state.settlements().get(item.origin());
+    var destination=state.settlements().get(item.destination());
+    String from=origin==null?"unknown":origin.name();
+    String to=destination==null?"unknown":destination.name();
+    String line=(item.active()?"ACTIVE":"PAUSED")+" "+from+" -> "+to+" | "+item.quantity()+" "+item.good()+" / "+item.intervalTicks()+" ticks | id="+item.id();
+    c.getSource().sendSuccess(()->Component.literal(line),false);
+   }
+   c.getSource().sendSuccess(()->Component.literal("Shipments in transit: "+SIMULATION.tradeRoutes().inTransit()),false);
+   return routes.size();
+  }));
+  route.then(Commands.literal("pause").then(Commands.argument("id",StringArgumentType.word()).executes(c->{
+   try{
+    var id=java.util.UUID.fromString(StringArgumentType.getString(c,"id"));
+    var updated=SIMULATION.tradeRoutes().setActive(id,false);
+    if(updated==null){c.getSource().sendFailure(Component.literal("Trade route ID not found."));return 0;}
+    c.getSource().sendSuccess(()->Component.literal("Trade route paused."),false);return 1;
+   }catch(IllegalArgumentException ex){c.getSource().sendFailure(Component.literal("Invalid route ID."));return 0;}
+  })));
+  route.then(Commands.literal("resume").then(Commands.argument("id",StringArgumentType.word()).executes(c->{
+   try{
+    var id=java.util.UUID.fromString(StringArgumentType.getString(c,"id"));
+    var updated=SIMULATION.tradeRoutes().setActive(id,true);
+    if(updated==null){c.getSource().sendFailure(Component.literal("Trade route ID not found."));return 0;}
+    c.getSource().sendSuccess(()->Component.literal("Trade route resumed."),false);return 1;
+   }catch(IllegalArgumentException ex){c.getSource().sendFailure(Component.literal("Invalid route ID."));return 0;}
+  })));
+  root.then(route);
+  return root;
+ }
+
+ private static WorldMorphState.SettlementData findSettlement(WorldMorphState state,String input){
+  String normalized=input.replaceAll("[^A-Za-z0-9]","");
+  return state.settlements().values().stream().filter(s->
+   s.name().equalsIgnoreCase(input)||s.name().replaceAll("[^A-Za-z0-9]","").equalsIgnoreCase(normalized))
+   .findFirst().orElse(null);
+ }
+
  private static LiteralArgumentBuilder<CommandSourceStack> orderCommands(){
   var root=Commands.literal("order");
   var war=Commands.argument("kingdom",StringArgumentType.word()).then(Commands.argument("reason",StringArgumentType.greedyString()).executes(c->{
