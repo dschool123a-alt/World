@@ -83,7 +83,7 @@ public final class WorldMorph implements ModInitializer {
   root.then(Commands.literal("war").then(war));
   var peace=Commands.argument("kingdom",StringArgumentType.word()).then(Commands.argument("reason",StringArgumentType.greedyString()).executes(c->{
    var player=c.getSource().getPlayerOrException(); var state=WorldMorphStateAccess.get(c.getSource().getLevel());
-   boolean ok=ROYAL.orderPeace(c.getSource().getLevel(),state,SIMULATION.npcs(),SIMULATION.roads(),player.getUUID(),StringArgumentType.getString(c,"kingdom"),StringArgumentType.getString(c,"reason"));
+   boolean ok=SIMULATION.royalAdministration().orderPeace(c.getSource().getLevel(),state,SIMULATION.npcs(),SIMULATION.roads(),player.getUUID(),StringArgumentType.getString(c,"kingdom"),StringArgumentType.getString(c,"reason"));
    if(!ok){c.getSource().sendFailure(Component.literal("Peace order rejected: you need 100 citizens, a valid target kingdom, and no current mission."));return 0;}
    c.getSource().sendSuccess(()->Component.literal("Peace proposal dispatched by mounted messenger."),true); return 1;
   }));
@@ -92,7 +92,7 @@ public final class WorldMorph implements ModInitializer {
    var player=c.getSource().getPlayerOrException(); var state=WorldMorphStateAccess.get(c.getSource().getLevel());
    var k=state.kingdoms().values().stream().filter(x->x.leader().equals(player.getUUID())).findFirst().orElse(null);
    if(k==null){c.getSource().sendFailure(Component.literal("You must lead a kingdom first."));return 0;}
-   c.getSource().sendSuccess(()->Component.literal(ROYAL.unlocked(state,k.id())+" | "+ROYAL.status(k.id())),false); return 1;
+   c.getSource().sendSuccess(()->Component.literal(SIMULATION.royalAdministration().unlocked(state,k.id())+" | "+SIMULATION.royalAdministration().status(k.id())),false); return 1;
   }));
   return root;
  }
