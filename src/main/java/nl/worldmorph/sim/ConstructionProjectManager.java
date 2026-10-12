@@ -180,7 +180,7 @@ public final class ConstructionProjectManager {
         BlockPos base = new BlockPos(settlement.center().getX(), y, settlement.center().getZ());
         List<Placement> blocks = new ArrayList<>();
         for (int h = 0; h < 3; h++) add(blocks, base.above(h), state(Blocks.STONE_BRICKS));
-        add(blocks, base.above(3), state(Blocks.GOLD_BLOCK));
+        add(blocks, base.above(3), state(Blocks.STONE_BRICKS));
         queue.add(new Project(Kind.MONUMENT, settlement.id(), settlement.kingdomId(),
                 settlement.name() + " monument", base, 0, blocks));
     }
