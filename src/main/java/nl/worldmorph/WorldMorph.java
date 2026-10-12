@@ -28,12 +28,11 @@ public final class WorldMorph implements ModInitializer {
  public static final String MOD_ID="worldmorph";
  public static final Logger LOGGER=LoggerFactory.getLogger(MOD_ID);
  private static final WorldMorphSimulation SIMULATION=new WorldMorphSimulation();
- private static final RoyalAdministrationManager ROYAL=new RoyalAdministrationManager();
 
  @Override public void onInitialize(){
   LOGGER.info("WorldMorph civilization simulation loaded.");
   CommandRegistrationCallback.EVENT.register((dispatcher,registryAccess,environment)->registerCommands(dispatcher));
-  ServerTickEvents.END_SERVER_TICK.register(server -> { SIMULATION.tick(server); for (var level : server.getAllLevels()) { ARMIES.tick(level); ROYAL.tick(level,WorldMorphStateAccess.get(level),SIMULATION.npcs(),SIMULATION.roads()); } });
+  ServerTickEvents.END_SERVER_TICK.register(server -> { SIMULATION.tick(server); for (var level : server.getAllLevels()) ARMIES.tick(level); });
  }
  private static void registerCommands(CommandDispatcher<CommandSourceStack> d){
   var root=Commands.literal("worldmorph");
@@ -77,7 +76,7 @@ public final class WorldMorph implements ModInitializer {
   var root=Commands.literal("order");
   var war=Commands.argument("kingdom",StringArgumentType.word()).then(Commands.argument("reason",StringArgumentType.greedyString()).executes(c->{
    var player=c.getSource().getPlayerOrException(); var state=WorldMorphStateAccess.get(c.getSource().getLevel());
-   boolean ok=ROYAL.orderWar(c.getSource().getLevel(),state,SIMULATION.npcs(),SIMULATION.roads(),player.getUUID(),StringArgumentType.getString(c,"kingdom"),StringArgumentType.getString(c,"reason"));
+   boolean ok=SIMULATION.royalAdministration().orderWar(c.getSource().getLevel(),state,SIMULATION.npcs(),SIMULATION.roads(),player.getUUID(),StringArgumentType.getString(c,"kingdom"),StringArgumentType.getString(c,"reason"));
    if(!ok){c.getSource().sendFailure(Component.literal("Royal order rejected: you need 100 citizens, a valid target kingdom, and no current mission."));return 0;}
    c.getSource().sendSuccess(()->Component.literal("Order accepted. The Royal Assistant has dispatched a mounted messenger."),true); return 1;
   }));
