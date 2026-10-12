@@ -163,8 +163,13 @@ public final class ConstructionProjectManager {
         boolean queued=queue.stream().anyMatch(p->p.kind==kind&&p.settlementId.equals(s.id()));
         if(built||queued)return;
         int y=level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,base.getX(),base.getZ());
-        base=new BlockPos(base.getX(),y,base.getZ());
-        queue.add(new Project(kind,s.id(),s.kingdomId(),s.name()+" "+label.toLowerCase(),base,0,plan));
+        int verticalShift = y - base.getY();
+        BlockPos adjustedBase = new BlockPos(base.getX(),y,base.getZ());
+        List<Placement> adjustedPlan = new ArrayList<>(plan.size());
+        for (Placement placement : plan) {
+            adjustedPlan.add(new Placement(placement.pos().offset(0, verticalShift, 0), placement.state()));
+        }
+        queue.add(new Project(kind,s.id(),s.kingdomId(),s.name()+" "+label.toLowerCase(),adjustedBase,0,adjustedPlan));
         registry.add(s.id());
         state.history(label+"_ORDERED","Citizens of "+s.name()+" started building the "+label.toLowerCase()+".");
     }
@@ -227,6 +232,18 @@ public final class ConstructionProjectManager {
         List<Villager> miners = level.getEntitiesOfClass(Villager.class,
                 new net.minecraft.world.phys.AABB(project.base).inflate(64),
                 v -> v.isAlive() && !v.isBaby() && isSettlementWorker(v, project, npcs, "MINER")).stream().limit(3).toList();
+
+        // Gather missing raw materials before returning builders to the work site.
+        // Otherwise villagers would walk back to the building every tick and never reach a mine.
+        if (project.index < project.blocks.size()) {
+            String needed = materialKey(project.blocks.get(project.index).state());
+            if (needed != null && !hasMaterial(project.settlementId, needed)) {
+                List<Villager> gatherers = miners.isEmpty() ? builders : miners;
+                mineForConstruction(level, project, gatherers);
+                project.cooldown = 10;
+                return;
+            }
+        }
 
         // Construction is performed by actual citizens assigned to the BUILDER job.
         // Give builders a small amount of visible work state so other systems can react to it.
@@ -343,20 +360,61 @@ public final class ConstructionProjectManager {
         stock.computeIfPresent(material, (k, v) -> v > 1 ? v - 1 : null);
     }
 
-    private void mineForConstruction(ServerLevel level, Project project, List<Villager> builders) {
-        String needed = project.index < project.blocks.size() ? materialKey(project.blocks.get(project.index).state()) : null;
-        if (needed == null) return;
-        for (Villager villager : builders) {
-            BlockPos origin = villager.blockPosition();
-            for (int dx = -5; dx <= 5; dx++) for (int dy = -2; dy <= 3; dy++) for (int dz = -5; dz <= 5; dz++) {
+    private void mineForConstruction(ServerLevel level, Project project, List<Villager> workers) {
+        String needed = project.index < project.blocks.size()
+                ? materialKey(project.blocks.get(project.index).state()) : null;
+        if (needed == null || workers.isEmpty()) return;
+
+        Villager selectedWorker = null;
+        BlockPos selectedResource = null;
+        BlockPos selectedApproach = null;
+        double nearest = Double.MAX_VALUE;
+        for (Villager worker : workers) {
+            BlockPos origin = worker.blockPosition();
+            for (int dx = -20; dx <= 20; dx++) for (int dy = -12; dy <= 8; dy++) for (int dz = -20; dz <= 20; dz++) {
                 BlockPos pos = origin.offset(dx, dy, dz);
                 BlockState found = level.getBlockState(pos);
                 if (!needed.equals(mineableMaterialKey(found)) || found.isAir()) continue;
-                level.destroyBlock(pos, false);
-                minedMaterials.computeIfAbsent(project.settlementId, k -> new HashMap<>()).merge(needed, 1, Integer::sum);
-                return;
+                if ("WOOD".equals(needed) && !hasNearbyLeaves(level, pos)) continue;
+                BlockPos approach = null;
+                BlockPos[] options = {pos.above(), pos.north(), pos.south(), pos.east(), pos.west()};
+                for (BlockPos option : options) {
+                    if (level.getBlockState(option).isAir() && level.getBlockState(option.above()).isAir()) {
+                        approach = option;
+                        break;
+                    }
+                }
+                if (approach == null) continue;
+                double distance = origin.distSqr(pos);
+                if (distance < nearest) {
+                    nearest = distance;
+                    selectedWorker = worker;
+                    selectedResource = pos;
+                    selectedApproach = approach;
+                }
             }
         }
+        if (selectedWorker == null || selectedResource == null || selectedApproach == null) return;
+
+        if (selectedWorker.blockPosition().distSqr(selectedApproach) > 6.0) {
+            selectedWorker.getNavigation().moveTo(selectedApproach.getX() + 0.5,
+                    selectedApproach.getY(), selectedApproach.getZ() + 0.5, 1.0D);
+            return;
+        }
+        level.destroyBlock(selectedResource, false);
+        minedMaterials.computeIfAbsent(project.settlementId, k -> new HashMap<>())
+                .merge(needed, 1, Integer::sum);
+        selectedWorker.getNavigation().stop();
+    }
+
+    private boolean hasNearbyLeaves(ServerLevel level, BlockPos log) {
+        for (int y = 1; y <= 6; y++) {
+            for (int dx = -3; dx <= 3; dx++) for (int dz = -3; dz <= 3; dz++) {
+                String id = BuiltInRegistries.BLOCK.getKey(level.getBlockState(log.offset(dx, y, dz)).getBlock()).getPath();
+                if (id.endsWith("_leaves")) return true;
+            }
+        }
+        return false;
     }
 
     private String materialKey(BlockState state) {
