@@ -49,8 +49,6 @@ public final class ConstructionProjectManager {
     private final Set<UUID> librarySettlements = new HashSet<>();
     private final Set<UUID> townHallSettlements = new HashSet<>();
     private final Set<UUID> farmSettlements = new HashSet<>();
-    /** Construction stock is earned by physically mining nearby world blocks; nothing is spawned. */
-    private final Map<UUID, Map<String, Integer>> minedMaterials = new HashMap<>();
     private static final int[] CASTLE_POPULATION = {100, 200, 350, 500, 750};
     private static final int[] CASTLE_COST = {250, 400, 650, 900, 1300};
 
@@ -237,9 +235,9 @@ public final class ConstructionProjectManager {
         // Otherwise villagers would walk back to the building every tick and never reach a mine.
         if (project.index < project.blocks.size()) {
             String needed = materialKey(project.blocks.get(project.index).state());
-            if (needed != null && !hasMaterial(project.settlementId, needed)) {
+            if (needed != null && !hasMaterial(state, project.settlementId, needed)) {
                 List<Villager> gatherers = miners.isEmpty() ? builders : miners;
-                mineForConstruction(level, project, gatherers);
+                mineForConstruction(level, state, project, gatherers);
                 project.cooldown = 10;
                 return;
             }
@@ -277,7 +275,7 @@ public final class ConstructionProjectManager {
             if (placement.state().isAir()) { project.index++; continue; }
             String material = materialKey(placement.state());
             if (material == null) { project.index++; continue; }
-            if (!hasMaterial(project.settlementId, material)) {
+            if (!hasMaterial(state, project.settlementId, material)) {
                 List<Villager> gatherers = miners.isEmpty() ? builders : miners;
                 for (Villager villager : gatherers) {
                     NpcProfile profile = npcs.get(villager.getUUID());
@@ -291,7 +289,7 @@ public final class ConstructionProjectManager {
             }
             project.index++;
             if (level.getBlockState(placement.pos()).isAir() || level.getBlockState(placement.pos()).canBeReplaced()) {
-                consumeMaterial(project.settlementId, material);
+                consumeMaterial(state, project.settlementId, material);
                 level.setBlock(placement.pos(), placement.state(), 3);
                 placed++;
             }
@@ -348,19 +346,15 @@ public final class ConstructionProjectManager {
                 && job.equals(profile.job());
     }
 
-    private boolean hasMaterial(UUID settlementId, String material) {
-        return material != null
-                && minedMaterials.getOrDefault(settlementId, Map.of()).getOrDefault(material, 0) > 0;
+    private boolean hasMaterial(WorldMorphState state, UUID settlementId, String material) {
+        return material != null && state.constructionMaterial(settlementId, material) > 0;
     }
 
-    private void consumeMaterial(UUID settlementId, String material) {
-        if (material == null) return;
-        Map<String, Integer> stock = minedMaterials.get(settlementId);
-        if (stock == null) return;
-        stock.computeIfPresent(material, (k, v) -> v > 1 ? v - 1 : null);
+    private void consumeMaterial(WorldMorphState state, UUID settlementId, String material) {
+        if (material != null) state.consumeConstructionMaterial(settlementId, material);
     }
 
-    private void mineForConstruction(ServerLevel level, Project project, List<Villager> workers) {
+    private void mineForConstruction(ServerLevel level, WorldMorphState state, Project project, List<Villager> workers) {
         String needed = project.index < project.blocks.size()
                 ? materialKey(project.blocks.get(project.index).state()) : null;
         if (needed == null || workers.isEmpty()) return;
@@ -410,8 +404,7 @@ public final class ConstructionProjectManager {
             return;
         }
         level.destroyBlock(selectedResource, false);
-        minedMaterials.computeIfAbsent(project.settlementId, k -> new HashMap<>())
-                .merge(needed, 1, Integer::sum);
+        state.addConstructionMaterial(project.settlementId, needed, 1);
         selectedWorker.getNavigation().stop();
     }
 
