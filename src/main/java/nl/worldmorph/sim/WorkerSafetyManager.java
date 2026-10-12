@@ -17,9 +17,11 @@ public final class WorkerSafetyManager {
     private final NpcManager npcs;
     private WorldMorphState state;
     private static boolean installed;
+    private static WorkerSafetyManager active;
 
     public WorkerSafetyManager(NpcManager npcs) {
         this.npcs = npcs;
+        active = this;
         install();
     }
 
@@ -32,7 +34,7 @@ public final class WorkerSafetyManager {
         installed = true;
 
         ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
-            if (!protectedWorker(entity)) return true;
+            if (active == null || !active.protectedWorker(entity)) return true;
             // Players can still intentionally attack a citizen; the protection is for
             // mining/building hazards and hostile mobs.
             if (source.getEntity() instanceof Player) return true;
@@ -40,7 +42,7 @@ public final class WorkerSafetyManager {
         });
 
         ServerLivingEntityEvents.ALLOW_DEATH.register((entity, source, amount) -> {
-            if (!protectedWorker(entity)) return true;
+            if (active == null || !active.protectedWorker(entity)) return true;
             if (source.getEntity() instanceof Player) return true;
             if (entity.getHealth() <= 0.0F) entity.setHealth(entity.getMaxHealth());
             return false;
