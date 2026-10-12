@@ -283,7 +283,7 @@ public final class ConstructionProjectManager {
                         profile.addMemory("MINING_FOR_CONSTRUCTION", null, state.getSimulationTick(), 2);
                     }
                 }
-                mineForConstruction(level, project, gatherers);
+                mineForConstruction(level, state, project, gatherers);
                 project.cooldown = 10;
                 return;
             }
