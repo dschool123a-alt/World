@@ -351,7 +351,7 @@ public final class ConstructionProjectManager {
             for (int dx = -5; dx <= 5; dx++) for (int dy = -2; dy <= 3; dy++) for (int dz = -5; dz <= 5; dz++) {
                 BlockPos pos = origin.offset(dx, dy, dz);
                 BlockState found = level.getBlockState(pos);
-                if (!needed.equals(materialKey(found)) || found.isAir()) continue;
+                if (!needed.equals(mineableMaterialKey(found)) || found.isAir()) continue;
                 level.destroyBlock(pos, false);
                 minedMaterials.computeIfAbsent(project.settlementId, k -> new HashMap<>()).merge(needed, 1, Integer::sum);
                 return;
@@ -361,14 +361,38 @@ public final class ConstructionProjectManager {
 
     private String materialKey(BlockState state) {
         String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
-        if (id.contains("log") || id.endsWith("_planks") || id.contains("wood") || id.contains("fence") || id.contains("stairs") || id.contains("slab") || id.contains("bookshelf")) return "WOOD";
-        if (id.equals("stone") || id.contains("cobblestone") || id.contains("stone_brick") || id.contains("andesite") || id.contains("diorite") || id.contains("granite") || id.contains("deepslate") || id.equals("polished_deepslate")) return "STONE";
+        if (id.endsWith("_log") || id.endsWith("_wood") || id.endsWith("_planks")
+                || id.contains("fence") || id.equals("crafting_table") || id.equals("barrel")
+                || id.contains("bookshelf") || id.equals("lectern")
+                || (id.endsWith("_stairs") && (id.startsWith("oak_") || id.startsWith("spruce_")
+                || id.startsWith("birch_") || id.startsWith("jungle_") || id.startsWith("acacia_")
+                || id.startsWith("dark_oak_") || id.startsWith("mangrove_") || id.startsWith("cherry_")
+                || id.startsWith("bamboo_") || id.startsWith("pale_oak_")))) return "WOOD";
+        if (id.equals("stone") || id.equals("gravel") || id.contains("cobblestone") || id.contains("stone_brick")
+                || id.contains("andesite") || id.contains("diorite") || id.contains("granite")
+                || id.contains("deepslate") || id.endsWith("_wall") || id.endsWith("_slab")
+                || id.endsWith("_stairs")) return "STONE";
         if (id.equals("sand") || id.contains("sandstone")) return "SAND";
-        if (id.equals("glass")) return "GLASS";
-        if (id.equals("iron_ore") || id.equals("deepslate_iron_ore") || id.equals("iron_block")) return "IRON";
+        if (id.equals("glass") || id.equals("glass_pane")) return "GLASS";
+        if (id.equals("iron_ore") || id.equals("deepslate_iron_ore") || id.equals("iron_block")
+                || id.equals("lantern") || id.equals("bell")) return "IRON";
         if (id.equals("gold_ore") || id.equals("deepslate_gold_ore") || id.equals("gold_block")) return "GOLD";
         if (id.equals("dirt") || id.equals("grass_block") || id.equals("coarse_dirt") || id.equals("farmland")) return "EARTH";
         if (id.equals("wool") || id.endsWith("_wool")) return "WOOL";
+        return null;
+    }
+
+    /** Only raw world resources may be mined; finished buildings cannot be dismantled for stock. */
+    private String mineableMaterialKey(BlockState state) {
+        String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+        if (id.endsWith("_log") || id.endsWith("_wood")) return "WOOD";
+        if (id.equals("stone") || id.equals("gravel") || id.equals("cobblestone")
+                || id.equals("andesite") || id.equals("diorite") || id.equals("granite")
+                || id.equals("deepslate") || id.equals("cobbled_deepslate")) return "STONE";
+        if (id.equals("sand")) return "SAND";
+        if (id.equals("dirt") || id.equals("grass_block") || id.equals("coarse_dirt")) return "EARTH";
+        if (id.equals("iron_ore") || id.equals("deepslate_iron_ore")) return "IRON";
+        if (id.equals("gold_ore") || id.equals("deepslate_gold_ore")) return "GOLD";
         return null;
     }
 
@@ -421,7 +445,7 @@ public final class ConstructionProjectManager {
             if(!edge) continue;
             boolean door=z==0&&x>=3&&x<=5&&y<=2;
             boolean window=y==2&&((z==0||z==6)&&(x==1||x==7));
-            add(out,b.offset(x,y,z),door?state(Blocks.AIR):window?state(Blocks.GLASS_PANE):wall);
+            add(out,b.offset(x,y,z),door?state(Blocks.AIR):window?state(Blocks.OAK_FENCE):wall);
         }
         for(int x=-1;x<=9;x++) for(int z=-1;z<=7;z++) {
             if(x==-1||x==9||z==-1||z==7) add(out,b.offset(x,5,z),roof);
@@ -434,7 +458,7 @@ public final class ConstructionProjectManager {
         BlockState floor = state(tier == 0 ? Blocks.COBBLESTONE : tier == 1 ? Blocks.STONE_BRICKS : Blocks.POLISHED_ANDESITE);
         BlockState wall = state(tier == 0 ? Blocks.OAK_PLANKS : tier == 1 ? Blocks.SPRUCE_PLANKS : Blocks.DARK_OAK_PLANKS);
         BlockState log = state(tier == 0 ? Blocks.OAK_LOG : tier == 1 ? Blocks.SPRUCE_LOG : Blocks.DARK_OAK_LOG);
-        BlockState roof = state(tier == 0 ? Blocks.SPRUCE_STAIRS : tier == 1 ? Blocks.STONE_BRICK_STAIRS : Blocks.DEEPSLATE_BRICK_STAIRS);
+        BlockState roof = state(tier == 0 ? Blocks.SPRUCE_PLANKS : tier == 1 ? Blocks.STONE_BRICKS : Blocks.POLISHED_DEEPSLATE);
         for (int x=0;x<7;x++) for(int z=0;z<7;z++) add(out,b.offset(x,0,z),floor);
         for (int y=1;y<=3;y++) for(int x=0;x<7;x++) for(int z=0;z<7;z++) {
             boolean edge=x==0||x==6||z==0||z==6;
@@ -451,8 +475,6 @@ public final class ConstructionProjectManager {
         }
         Block ridge=tier==0?Blocks.SPRUCE_PLANKS:tier==1?Blocks.STONE_BRICKS:Blocks.POLISHED_DEEPSLATE;
         for(int x=2;x<=4;x++) add(out,b.offset(x,6,3),state(ridge));
-        if(tier>=1){add(out,b.offset(3,1,3),state(Blocks.CRAFTING_TABLE));add(out,b.offset(2,1,3),state(Blocks.BARREL));}
-        if(tier>=2){add(out,b.offset(4,1,3),state(Blocks.LANTERN));add(out,b.offset(3,1,4),state(Blocks.BOOKSHELF));}
         return out;
     }
 
@@ -488,17 +510,13 @@ public final class ConstructionProjectManager {
                 for(int y=0;y<(phase>=4?5:3);y++) add(out,b.offset(x,y,z),stone);
             }
         }
-        if(phase>=3) {
-            for(int x=-radius-3;x<=radius+3;x+=2) for(int z=-radius-3;z<=radius+3;z+=2)
-                add(out,b.offset(x, height+1, z),state(Blocks.LANTERN));
-        }
         if(phase>=4) {
             for(int x=-4;x<=4;x++) for(int z=-4;z<=4;z++)
-                add(out,b.offset(x,keepHeight,z),state(Blocks.STONE_BRICK_SLAB));
+                add(out,b.offset(x,keepHeight,z),state(Blocks.STONE_BRICKS));
         }
         if(phase>=5) {
-            for(int y=keepHeight+1;y<=keepHeight+6;y++) add(out,b.offset(0,y,0),state(Blocks.GOLD_BLOCK));
-            for(int x=-2;x<=2;x++) add(out,b.offset(x,keepHeight+7,0),state(Blocks.GOLD_BLOCK));
+            for(int y=keepHeight+1;y<=keepHeight+6;y++) add(out,b.offset(0,y,0),state(Blocks.DEEPSLATE_BRICKS));
+            for(int x=-2;x<=2;x++) add(out,b.offset(x,keepHeight+7,0),state(Blocks.DEEPSLATE_BRICKS));
         }
         return out;
     }
