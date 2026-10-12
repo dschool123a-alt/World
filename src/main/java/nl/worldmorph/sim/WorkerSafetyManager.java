@@ -50,7 +50,7 @@ public final class WorkerSafetyManager {
     }
 
     private boolean protectedWorker(LivingEntity entity) {
-        if (state == null || !entity.isAlive()) return false;
+        if (state == null || entity.isRemoved()) return false;
         NpcProfile profile = npcs.get(entity.getUUID());
         if (profile == null || !profile.alive()) return false;
         if (!"MINER".equals(profile.job()) && !"BUILDER".equals(profile.job())) return false;
