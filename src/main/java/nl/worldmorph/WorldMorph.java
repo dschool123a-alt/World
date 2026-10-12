@@ -99,7 +99,7 @@ public final class WorldMorph implements ModInitializer {
         }
         c.getSource().sendSuccess(()->Component.literal("Trade route created: "+created.quantity()+" "+created.good()+" from "+origin.name()+" to "+destination.name()+", every "+created.intervalTicks()+" ticks. Goods travel using the road network and must exist in the origin stockpile."),true);
         return 1;
-       }))))));
+       })))))));
   route.then(Commands.literal("list").executes(c->{
    var state=WorldMorphStateAccess.get(c.getSource().getLevel());
    var routes=SIMULATION.tradeRoutes().all();
