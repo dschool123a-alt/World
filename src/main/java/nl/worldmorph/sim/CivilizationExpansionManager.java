@@ -129,7 +129,9 @@ public final class CivilizationExpansionManager {
             if (p.age() < 6) jobs.assign(p, JobType.UNEMPLOYED);
             else if (p.age() < 16) jobs.assign(p, JobType.UNEMPLOYED);
             else if ("UNEMPLOYED".equals(p.job())) {
-                JobType[] choices = {JobType.FARMER, JobType.BUILDER, JobType.MERCHANT, JobType.SOLDIER};
+                // Keep a real pool of builders and miners available for physical construction.
+                // Below 50 residents everyone may help build; above that threshold only BUILDERs do.
+                JobType[] choices = {JobType.FARMER, JobType.BUILDER, JobType.MERCHANT, JobType.SOLDIER, JobType.MINER};
                 int index = Math.floorMod(p.id().hashCode(), choices.length);
                 jobs.assign(p, choices[index]);
                 p.addMemory("BECAME_WORKER", null, state.getSimulationTick(), 3);
