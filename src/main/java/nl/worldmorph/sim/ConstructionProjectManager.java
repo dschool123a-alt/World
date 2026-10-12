@@ -371,11 +371,12 @@ public final class ConstructionProjectManager {
         double nearest = Double.MAX_VALUE;
         for (Villager worker : workers) {
             BlockPos origin = worker.blockPosition();
-            for (int dx = -20; dx <= 20; dx++) for (int dy = -12; dy <= 8; dy++) for (int dz = -20; dz <= 20; dz++) {
+            for (int dx = -16; dx <= 16; dx++) for (int dy = -20; dy <= 8; dy++) for (int dz = -16; dz <= 16; dz++) {
                 BlockPos pos = origin.offset(dx, dy, dz);
                 BlockState found = level.getBlockState(pos);
                 if (!needed.equals(mineableMaterialKey(found)) || found.isAir()) continue;
                 if ("WOOD".equals(needed) && !hasNearbyLeaves(level, pos)) continue;
+
                 BlockPos approach = null;
                 BlockPos[] options = {pos.above(), pos.north(), pos.south(), pos.east(), pos.west()};
                 for (BlockPos option : options) {
@@ -384,8 +385,15 @@ public final class ConstructionProjectManager {
                         break;
                     }
                 }
+                // Underground stone is still a real world block: miners travel to its
+                // surface location, then remove that block without spawning an item entity.
+                if (approach == null && "STONE".equals(needed)) {
+                    int surfaceY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                            pos.getX(), pos.getZ());
+                    approach = new BlockPos(pos.getX(), surfaceY, pos.getZ());
+                }
                 if (approach == null) continue;
-                double distance = origin.distSqr(pos);
+                double distance = origin.distSqr(approach);
                 if (distance < nearest) {
                     nearest = distance;
                     selectedWorker = worker;
