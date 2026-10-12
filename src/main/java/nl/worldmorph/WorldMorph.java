@@ -18,6 +18,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import nl.worldmorph.data.WorldMorphStateAccess;
+import nl.worldmorph.data.WorldMorphState;
 import nl.worldmorph.npc.NpcProfile;
 import nl.worldmorph.sim.*;
 import org.slf4j.Logger;
@@ -37,11 +38,141 @@ public final class WorldMorph implements ModInitializer {
  private static void registerCommands(CommandDispatcher<CommandSourceStack> d){
   var root=Commands.literal("worldmorph");
   root.then(Commands.literal("test").executes(c->{c.getSource().sendSuccess(()->Component.literal("WorldMorph OK - simulation running."),false);return 1;}));
+  root.then(Commands.literal("arrival")
+    .then(Commands.literal("follow").then(Commands.argument("npc",StringArgumentType.word()).executes(c->{
+      var player=c.getSource().getPlayerOrException();
+      try {
+       var id=java.util.UUID.fromString(StringArgumentType.getString(c,"npc"));
+       boolean ok=SIMULATION.dayOneArrival().follow(c.getSource().getLevel(),player,id);
+       if(ok)c.getSource().sendSuccess(()->Component.literal("The settler is coming with you."),false);
+       else c.getSource().sendFailure(Component.literal("That settler is no longer available."));
+       return ok?1:0;
+      } catch(IllegalArgumentException ex){return 0;}
+    })))
+    .then(Commands.literal("wait").then(Commands.argument("npc",StringArgumentType.word()).executes(c->{
+      try {
+       var id=java.util.UUID.fromString(StringArgumentType.getString(c,"npc"));
+       boolean ok=SIMULATION.dayOneArrival().wait(id);
+       if(ok)c.getSource().sendSuccess(()->Component.literal("The settler will wait here."),false);
+       return ok?1:0;
+      } catch(IllegalArgumentException ex){return 0;}
+    })))
+    .then(Commands.literal("build").then(Commands.argument("npc",StringArgumentType.word()).executes(c->{
+      var player=c.getSource().getPlayerOrException();
+      try {
+       var id=java.util.UUID.fromString(StringArgumentType.getString(c,"npc"));
+       boolean ok=SIMULATION.dayOneArrival().build(c.getSource().getLevel(),WorldMorphStateAccess.get(c.getSource().getLevel()),SIMULATION.npcs(),player,id);
+       if(ok)c.getSource().sendSuccess(()->Component.literal("Your first settlement has been founded."),true);
+       return ok?1:0;
+      } catch(IllegalArgumentException ex){return 0;}
+    }))));
+
   root.then(Commands.literal("debug").requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS)).executes(c->{var s=WorldMorphStateAccess.get(c.getSource().getLevel());c.getSource().sendSuccess(()->Component.literal("tick="+s.getSimulationTick()+" | kingdoms="+s.kingdoms().size()+" | settlements="+s.settlements().size()+" | NPCs="+SIMULATION.npcs().size()+" | history="+s.history().size()),false);return 1;}));
-  root.then(kingdomCommands()); root.then(settlementCommands()); root.then(npcCommands()); root.then(statusCommands()); root.then(eventCommands()); root.then(armyCommands());
+  root.then(kingdomCommands()); root.then(orderCommands()); root.then(tradeRouteCommands()); root.then(settlementCommands()); root.then(npcCommands()); root.then(statusCommands()); root.then(eventCommands()); root.then(armyCommands());
   root.then(jobCommands()); root.then(lawCommands()); root.then(taxCommands()); root.then(familyCommands()); root.then(homeCommands());
   root.then(historyCommands()); root.then(economyCommands()); root.then(reputationCommands()); root.then(technologyCommands()); root.then(warCommands()); root.then(cannonCommands());
   d.register(root);
+ }
+ private static LiteralArgumentBuilder<CommandSourceStack> tradeRouteCommands(){
+  var root=Commands.literal("trade");
+  var route=Commands.literal("route");
+
+  var intervalArg=Commands.argument("interval",IntegerArgumentType.integer(20,10000000)).executes(c->{
+   var state=WorldMorphStateAccess.get(c.getSource().getLevel());
+   String originName=StringArgumentType.getString(c,"origin");
+   String destinationName=StringArgumentType.getString(c,"destination");
+   var origin=findSettlement(state,originName);
+   var destination=findSettlement(state,destinationName);
+   if(origin==null||destination==null){
+    c.getSource().sendFailure(Component.literal("Settlement not found. Use the settlement name without spaces, e.g. NewVillage."));
+    return 0;
+   }
+   var created=SIMULATION.tradeRoutes().create(origin.id(),destination.id(),
+    StringArgumentType.getString(c,"good"),IntegerArgumentType.getInteger(c,"quantity"),IntegerArgumentType.getInteger(c,"interval"));
+   if(created==null){
+    c.getSource().sendFailure(Component.literal("Route rejected. Goods: WOOD, STONE, IRON, GRAIN, FOOD, TOOLS, GOLD. Quantity must be positive and interval at least 20 ticks."));
+    return 0;
+   }
+   c.getSource().sendSuccess(()->Component.literal("Trade route created: "+created.quantity()+" "+created.good()+" from "+origin.name()+" to "+destination.name()+", every "+created.intervalTicks()+" ticks. Goods travel using the road network and must exist in the origin stockpile."),true);
+   return 1;
+  });
+  var quantityArg=Commands.argument("quantity",IntegerArgumentType.integer(1,100000)).then(intervalArg);
+  var goodArg=Commands.argument("good",StringArgumentType.word()).then(quantityArg);
+  var destinationArg=Commands.argument("destination",StringArgumentType.word()).then(goodArg);
+  var originArg=Commands.argument("origin",StringArgumentType.word()).then(destinationArg);
+  route.then(Commands.literal("create").then(originArg));
+
+  route.then(Commands.literal("list").executes(c->{
+   var state=WorldMorphStateAccess.get(c.getSource().getLevel());
+   var routes=SIMULATION.tradeRoutes().all();
+   if(routes.isEmpty()){
+    c.getSource().sendSuccess(()->Component.literal("No trade routes. Create one with /worldmorph trade route create <origin> <destination> <good> <quantity> <interval>."),false);
+    return 1;
+   }
+   for(var item:routes){
+    var origin=state.settlements().get(item.origin());
+    var destination=state.settlements().get(item.destination());
+    String from=origin==null?"unknown":origin.name();
+    String to=destination==null?"unknown":destination.name();
+    String line=(item.active()?"ACTIVE":"PAUSED")+" "+from+" -> "+to+" | "+item.quantity()+" "+item.good()+" / "+item.intervalTicks()+" ticks | id="+item.id();
+    c.getSource().sendSuccess(()->Component.literal(line),false);
+   }
+   c.getSource().sendSuccess(()->Component.literal("Shipments in transit: "+SIMULATION.tradeRoutes().inTransit()),false);
+   return routes.size();
+  }));
+
+  route.then(Commands.literal("pause").then(Commands.argument("id",StringArgumentType.word()).executes(c->{
+   try{
+    var id=java.util.UUID.fromString(StringArgumentType.getString(c,"id"));
+    var updated=SIMULATION.tradeRoutes().setActive(id,false);
+    if(updated==null){c.getSource().sendFailure(Component.literal("Trade route ID not found."));return 0;}
+    c.getSource().sendSuccess(()->Component.literal("Trade route paused."),false);return 1;
+   }catch(IllegalArgumentException ex){c.getSource().sendFailure(Component.literal("Invalid route ID."));return 0;}
+  })));
+
+  route.then(Commands.literal("resume").then(Commands.argument("id",StringArgumentType.word()).executes(c->{
+   try{
+    var id=java.util.UUID.fromString(StringArgumentType.getString(c,"id"));
+    var updated=SIMULATION.tradeRoutes().setActive(id,true);
+    if(updated==null){c.getSource().sendFailure(Component.literal("Trade route ID not found."));return 0;}
+    c.getSource().sendSuccess(()->Component.literal("Trade route resumed."),false);return 1;
+   }catch(IllegalArgumentException ex){c.getSource().sendFailure(Component.literal("Invalid route ID."));return 0;}
+  })));
+
+  root.then(route);
+  return root;
+ }
+
+ private static WorldMorphState.SettlementData findSettlement(WorldMorphState state,String input){
+  String normalized=input.replaceAll("[^A-Za-z0-9]","");
+  return state.settlements().values().stream().filter(s->
+   s.name().equalsIgnoreCase(input)||s.name().replaceAll("[^A-Za-z0-9]","").equalsIgnoreCase(normalized))
+   .findFirst().orElse(null);
+ }
+
+ private static LiteralArgumentBuilder<CommandSourceStack> orderCommands(){
+  var root=Commands.literal("order");
+  var war=Commands.argument("kingdom",StringArgumentType.word()).then(Commands.argument("reason",StringArgumentType.greedyString()).executes(c->{
+   var player=c.getSource().getPlayerOrException(); var state=WorldMorphStateAccess.get(c.getSource().getLevel());
+   boolean ok=SIMULATION.royalAdministration().orderWar(c.getSource().getLevel(),state,SIMULATION.npcs(),SIMULATION.roads(),player.getUUID(),StringArgumentType.getString(c,"kingdom"),StringArgumentType.getString(c,"reason"));
+   if(!ok){c.getSource().sendFailure(Component.literal("Royal order rejected: you need 100 citizens, a valid target kingdom, and no current mission."));return 0;}
+   c.getSource().sendSuccess(()->Component.literal("Order accepted. The Royal Assistant has dispatched a mounted messenger."),true); return 1;
+  }));
+  root.then(Commands.literal("war").then(war));
+  var peace=Commands.argument("kingdom",StringArgumentType.word()).then(Commands.argument("reason",StringArgumentType.greedyString()).executes(c->{
+   var player=c.getSource().getPlayerOrException(); var state=WorldMorphStateAccess.get(c.getSource().getLevel());
+   boolean ok=SIMULATION.royalAdministration().orderPeace(c.getSource().getLevel(),state,SIMULATION.npcs(),SIMULATION.roads(),player.getUUID(),StringArgumentType.getString(c,"kingdom"),StringArgumentType.getString(c,"reason"));
+   if(!ok){c.getSource().sendFailure(Component.literal("Peace order rejected: you need 100 citizens, a valid target kingdom, and no current mission."));return 0;}
+   c.getSource().sendSuccess(()->Component.literal("Peace proposal dispatched by mounted messenger."),true); return 1;
+  }));
+  root.then(Commands.literal("peace").then(peace));
+  root.then(Commands.literal("status").executes(c->{
+   var player=c.getSource().getPlayerOrException(); var state=WorldMorphStateAccess.get(c.getSource().getLevel());
+   var k=state.kingdoms().values().stream().filter(x->x.leader().equals(player.getUUID())).findFirst().orElse(null);
+   if(k==null){c.getSource().sendFailure(Component.literal("You must lead a kingdom first."));return 0;}
+   c.getSource().sendSuccess(()->Component.literal(SIMULATION.royalAdministration().unlocked(state,k.id())+" | "+SIMULATION.royalAdministration().status(k.id())),false); return 1;
+  }));
+  return root;
  }
  private static LiteralArgumentBuilder<CommandSourceStack> kingdomCommands(){
   var root=Commands.literal("kingdom");

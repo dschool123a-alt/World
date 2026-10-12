@@ -23,6 +23,10 @@ Commands are registered under `/worldmorph`.
 | `/worldmorph settlement create <name>` | Found a settlement for the player's kingdom when possible |
 | `/worldmorph settlement list` | Show population and the five settlement need scores |
 | `/worldmorph settlement info <name>` | Inspect a settlement and its coordinates/needs |
+| `/worldmorph trade route create <origin> <destination> <good> <quantity> <interval>` | Create a delayed settlement shipment; use settlement names without spaces |
+| `/worldmorph trade route list` | List trade routes and shipments in transit |
+| `/worldmorph trade route pause <id>` | Pause a trade route using its ID from the list |
+| `/worldmorph trade route resume <id>` | Resume a paused trade route |
 | `/worldmorph status` | Show world population, treasury, stability and simulation totals |
 | `/worldmorph event list` | Show the latest world events from this server session |
 | `/worldmorph economy list` | List currently known market prices |
@@ -52,6 +56,9 @@ For job and law names, use the enum values shown by the command's error message,
 - NPC help/refuse interaction state and temporary speech bubbles for spawned villagers
 - Daily settlement events: harvests, shortages, merchant caravans, immigration, outbreaks, storms, discoveries and festivals; events adjust settlement needs, market prices, population and kingdom stability
 - Quick world/settlement diagnostics and market-price listing commands
+- Villager-built houses and civic buildings, roads, walls with watchtowers, and assistant-ordered castle phases
+- Construction materials mined from raw world blocks and stored in persistent world save data; finished buildings are not used as resource sources
+- Delayed settlement trade routes that consume available stockpiles and use road-network travel times
 - Building project planning, housing capacity, roads, resources, jobs and education data models
 - Government, laws, group reputation, factions, elections, family/dynasty and citizen mood data models
 - Diplomacy, treaties, trade ledger, quests, achievements and history/event models

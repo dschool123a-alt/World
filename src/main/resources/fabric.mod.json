@@ -6,10 +6,13 @@
   "description": "Server-side civilization simulation for Minecraft.",
   "authors": ["dschool123a-alt"],
   "license": "MIT",
-  "environment": "server",
+  "environment": "*",
   "entrypoints": {
     "main": [
       "nl.worldmorph.WorldMorph"
+    ],
+    "client": [
+      "nl.worldmorph.client.WorldMorphClient"
     ]
   },
   "depends": {

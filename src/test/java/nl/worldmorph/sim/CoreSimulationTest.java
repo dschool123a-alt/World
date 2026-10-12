@@ -2,6 +2,7 @@ package nl.worldmorph.sim;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import nl.worldmorph.npc.NpcProfile;
+import nl.worldmorph.data.WorldMorphState;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,4 +47,43 @@ class CoreSimulationTest {
   assertEquals(HomeManager.Type.HOST_HOME,homes.get(npc).type());
   assertEquals(home,homes.get(npc).position());
  }
+ @Test void minedConstructionMaterialsAreConsumedFromTheStockpile(){
+  WorldMorphState state=new WorldMorphState();
+  UUID settlement=UUID.randomUUID();
+  state.addConstructionMaterial(settlement,"STONE",2);
+  assertEquals(2,state.constructionMaterial(settlement,"STONE"));
+  assertTrue(state.consumeConstructionMaterial(settlement,"STONE"));
+  assertEquals(1,state.constructionMaterial(settlement,"STONE"));
+  assertTrue(state.consumeConstructionMaterial(settlement,"STONE"));
+  assertFalse(state.consumeConstructionMaterial(settlement,"STONE"));
+  assertEquals(0,state.constructionMaterial(settlement,"STONE"));
+ }
+ @Test void tradeRouteShipsOnlyStockedGoodsAndArrivesAfterTravelTime(){
+  WorldMorphState state=new WorldMorphState();
+  UUID leaderA=UUID.randomUUID(),leaderB=UUID.randomUUID();
+  var kingdomA=state.createKingdom("North",leaderA);
+  var kingdomB=state.createKingdom("South",leaderB);
+  var origin=state.createSettlement("NorthVillage",new BlockPos(0,64,0),kingdomA.id());
+  var destination=state.createSettlement("SouthVillage",new BlockPos(100,64,0),kingdomB.id());
+  ResourceManager resources=new ResourceManager();
+  RoadNetwork roads=new RoadNetwork();
+  TradeRouteManager routes=new TradeRouteManager();
+  resources.add(origin.id(),ResourceManager.Resource.WOOD,10);
+  var route=routes.create(origin.id(),destination.id(),"wood",4,20);
+  assertNotNull(route);
+  routes.tick(state,resources,roads);
+  assertEquals(6,resources.get(origin.id(),ResourceManager.Resource.WOOD));
+  assertEquals(0,resources.get(destination.id(),ResourceManager.Resource.WOOD));
+  for(int i=0;i<100;i++){state.tick();routes.tick(state,resources,roads);}
+  assertEquals(4,resources.get(destination.id(),ResourceManager.Resource.WOOD));
+  assertTrue(state.history().stream().anyMatch(e->e.type().equals("TRADE_ROUTE_ARRIVED")));
+ }
+ @Test void tradeRouteRejectsInvalidGoodsAndSelfTrade(){
+  TradeRouteManager routes=new TradeRouteManager();
+  UUID settlement=UUID.randomUUID();
+  assertNull(routes.create(settlement,settlement,"WOOD",1,20));
+  assertNull(routes.create(UUID.randomUUID(),UUID.randomUUID(),"DIAMONDS",1,20));
+  assertNull(routes.create(UUID.randomUUID(),UUID.randomUUID(),"WOOD",0,20));
+ }
+
 }
